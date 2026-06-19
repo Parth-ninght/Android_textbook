@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@layer base {
+  button {
+    @apply transition-all duration-150 active:scale-95 active:opacity-80;
+  }
+}
