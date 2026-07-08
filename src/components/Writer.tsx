@@ -21,36 +21,30 @@ interface WriterProps {
 
 function BookItem({ book, isSelectMode, isSelected, onLongPress, onClick }: any) {
   const longPressProps = useLongPress(onLongPress, onClick);
-  const totalWords = book.chapters.reduce((sum: number, c: any) => sum + c.wordCount, 0);
+  const latestChapter = [...(book.chapters || [])].filter(c => !c.isVolume).sort((a, b) => b.updatedAt - a.updatedAt)[0];
 
   return (
     <div
       {...longPressProps}
-      className={`bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform flex flex-col aspect-[3/4] relative ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-gray-100'}`}
+      className={`bg-white rounded-xl shadow-sm border p-3 cursor-pointer active:scale-[0.98] transition-transform flex items-center gap-4 relative ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-gray-100'}`}
     >
       {isSelectMode && (
         <div className="absolute top-2 right-2 z-20 bg-white rounded-full">
           {isSelected ? <CheckCircle2 size={24} className="text-indigo-600" /> : <Circle size={24} className="text-gray-300" />}
         </div>
       )}
-      <div className="bg-indigo-900 flex-1 flex items-center justify-center relative overflow-hidden">
+      <div className="w-16 h-24 bg-indigo-900 rounded-md flex items-center justify-center relative overflow-hidden shrink-0">
         {book.coverImage ? (
           <img src={book.coverImage} alt="Cover" className="w-full h-full object-cover" />
         ) : (
-          <>
-            <BookIcon size={48} className="text-indigo-800/50 absolute" />
-            <h3 className="font-bold text-white text-center z-10 line-clamp-3 p-4">{book.title}</h3>
-          </>
+          <h3 className="font-bold text-white text-[10px] text-center z-10 line-clamp-3 p-1">{book.title}</h3>
         )}
       </div>
-      <div className="p-3 bg-white">
-        {book.coverImage && (
-          <h3 className="font-bold text-gray-900 text-sm line-clamp-1 mb-1">{book.title}</h3>
-        )}
-        <div className="flex justify-between items-center">
-          <p className="text-xs text-gray-500">{book.chapters.filter(c => !c.isVolume).length} 章</p>
-          <p className="text-xs text-gray-400">{totalWords} 字</p>
-        </div>
+      <div className="flex-1 min-w-0 flex flex-col justify-center self-stretch">
+        <h3 className="font-bold text-gray-900 text-base line-clamp-1 mb-2">{book.title}</h3>
+        <p className="text-sm text-gray-500 line-clamp-1">
+          {latestChapter ? latestChapter.title : '暂无章节'}
+        </p>
       </div>
     </div>
   );
@@ -157,11 +151,11 @@ const highlightText = (text: string, query: string) => {
 
 export default function WriterTab({ setIsEditing, settings, onOpenSettings, isActiveTab = true }: WriterProps) {
   const [books, setBooks] = useLocalStorage<Book[]>('app_books', []);
-  const [activeBookId, setActiveBookId] = useLocalStorage<string | null>('writer_activeBookId', null);
-  const [activeChapterId, setActiveChapterId] = useLocalStorage<string | null>('writer_activeChapterId', null);
-  const [activeDraftId, setActiveDraftId] = useLocalStorage<string | null>('writer_activeDraftId', null);
-  const [activeOutlineId, setActiveOutlineId] = useLocalStorage<string | null>('writer_activeOutlineId', null);
-  const [activeSettingId, setActiveSettingId] = useLocalStorage<string | null>('writer_activeSettingId', null);
+  const [activeBookId, setActiveBookId] = useState<string | null>(null);
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
+  const [activeSettingId, setActiveSettingId] = useState<string | null>(null);
   const [isImmersive, setIsImmersive] = useLocalStorage('writer_isImmersive', false);
   const [isOverviewMode, setIsOverviewMode] = useLocalStorage('writer_isOverviewMode', false);
   const [isOverviewTOCMode, setIsOverviewTOCMode] = useLocalStorage('writer_isOverviewTOCMode', false);
@@ -284,6 +278,27 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   }, [activeBookId, setIsEditing, isActiveTab]);
 
   useEffect(() => {
+    if (!activeBookId) {
+      setBooks(prev => prev.filter(b => b.chapters.length > 0 || (b.title && b.title !== '未命名作品') || (b.drafts && b.drafts.length > 0) || (b.outlines && b.outlines.length > 0) || (b.settings && b.settings.length > 0)));
+    }
+  }, [activeBookId]);
+
+  useEffect(() => {
+    if (!activeChapterId && !activeDraftId && !activeOutlineId && !activeSettingId && activeBookId) {
+      setBooks(prev => prev.map(b => {
+        if (b.id !== activeBookId) return b;
+        return {
+          ...b,
+          chapters: b.chapters.filter(c => c.isVolume || c.content.trim() || (c.title.trim() && !c.title.match(/^第\s*[0-9一二三四五六七八九十百千万零两]+\s*章$/) && c.title !== '新分卷')),
+          drafts: (b.drafts || []).filter(d => d.content.trim() || (d.title.trim() && d.title !== '新草稿')),
+          outlines: (b.outlines || []).filter(o => o.content.trim() || (o.title.trim() && o.title !== '新大纲')),
+          settings: (b.settings || []).filter(s => s.content.trim() || (s.title.trim() && s.title !== '新设定'))
+        };
+      }));
+    }
+  }, [activeChapterId, activeDraftId, activeOutlineId, activeSettingId, activeBookId]);
+
+  useEffect(() => {
     if (!isOverviewMode || !activeBook) return;
 
     // Use a resize observer or timeout to calculate total pages and restore scroll
@@ -334,6 +349,12 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const handleImportSingleChapter = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeBook) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      alert('单个章节文件不能超过2MB，如果您想导入整本小说，请使用旁边的"导入拆分"功能！');
+      e.target.value = '';
+      return;
+    }
     
     try {
       const text = await file.text();
@@ -591,6 +612,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const enterBook = (bookId: string) => {
     const book = books.find(b => b.id === bookId);
     if (book) {
+      updateBook(bookId, { lastOpenedAt: Date.now() });
       setActiveBookId(bookId);
       setBookTab('chapters');
       const totalWords = book.chapters.reduce((sum, c) => sum + c.wordCount, 0);
@@ -2055,11 +2077,11 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-4 content-start">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 content-start">
         {books.length === 0 ? (
-          <div className="col-span-2 text-center text-gray-400 mt-20">暂无作品，点击右上角新建</div>
+          <div className="text-center text-gray-400 mt-20">暂无作品，点击右上角新建</div>
         ) : (
-          books.map(book => (
+          [...books].sort((a, b) => (b.lastOpenedAt || b.updatedAt) - (a.lastOpenedAt || a.updatedAt)).map(book => (
             <BookItem
               key={book.id}
               book={book}

@@ -46,6 +46,7 @@ export interface Book {
   title: string;
   description: string;
   coverImage?: string;
+  lastOpenedAt?: number;
   chapters: Chapter[];
   drafts?: Chapter[];
   outlines?: DocItem[];

@@ -40,12 +40,12 @@ export const exportToZip = async (data: {
 
   const modal = document.createElement('div');
   modal.style.backgroundColor = 'white';
-  modal.style.padding = '24px';
+  modal.style.padding = '20px';
   modal.style.borderRadius = '16px';
   modal.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
   modal.style.textAlign = 'center';
-  modal.style.width = '100%';
-  modal.style.maxWidth = '320px';
+  modal.style.width = '90%';
+  modal.style.maxWidth = '400px';
   modal.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
   const title = document.createElement('h2');
@@ -304,10 +304,10 @@ export const exportToZip = async (data: {
 
                 title.textContent = '原生提取就绪 ✨';
                 title.style.color = '#059669';
-                desc.textContent = '压缩包已由 Capacitor 生成至系统缓存！请点击下方按钮调用原生分享，发送到微信或保存至文件。这也是脱离沙盒最原生的方式。';
+                desc.textContent = '请点击下方按钮，发送到微信或保存至系统文件。';
                 
                 const shareBtn = document.createElement('button');
-                shareBtn.textContent = '使用原生分享/保存 (强力推荐)';
+                shareBtn.textContent = '保存 / 分享';
                 shareBtn.style.display = 'block';
                 shareBtn.style.backgroundColor = '#059669';
                 shareBtn.style.color = 'white';

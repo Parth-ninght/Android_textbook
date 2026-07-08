@@ -114,8 +114,8 @@ function SortableDiaryItem({ diary, onClick, onLongPress, isSelectMode, isSelect
 export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isActiveTab = true }: DiaryProps) {
   const [diaries, setDiaries] = useLocalStorage<Diary[]>('app_diaries', []);
   const [folders, setFolders] = useLocalStorage<Folder[]>('app_diary_folders', []);
-  const [activeDiaryId, setActiveDiaryId] = useLocalStorage<string | null>('diary_activeDiaryId', null);
-  const [activeFolderId, setActiveFolderId] = useLocalStorage<string | null>('diary_activeFolderId', null);
+  const [activeDiaryId, setActiveDiaryId] = useState<string | null>(null);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
 
   // Selection state
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -167,6 +167,12 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
       setIsEditing(activeDiaryId !== null);
     }
   }, [activeDiaryId, setIsEditing, isActiveTab]);
+
+  useEffect(() => {
+    if (!activeDiaryId) {
+      setDiaries(prev => prev.filter(d => d.content.trim() || d.weather?.trim() || d.mood?.trim()));
+    }
+  }, [activeDiaryId]);
 
   const displayedDiaries = diaries
     .filter(d => activeFolderId === null || d.folderId === activeFolderId)
