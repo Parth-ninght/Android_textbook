@@ -4,7 +4,7 @@ import { useLocalStorage } from '../store';
 import { Book, Chapter, DocItem, AppSettings } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
-import { Plus, ChevronLeft, Trash2, Book as BookIcon, EyeOff, Image as ImageIcon, CheckCircle2, Circle, Download, Upload, X, CheckSquare, BookOpen, Search, Edit3, List, Send, Moon, Sun, Type, Minus, ChevronRight, ArrowDownAZ, ArrowUpZA, FolderPlus, ArrowLeftRight, ArrowUpDown, Undo, Redo, Settings } from 'lucide-react';
+import { Plus, ChevronLeft, Trash2, Book as BookIcon, EyeOff, Image as ImageIcon, CheckCircle2, Circle, Download, Upload, X, CheckSquare, BookOpen, Search, Edit3, List, Send, Moon, Sun, Type, Minus, ChevronRight, ArrowDownAZ, ArrowUpZA, FolderPlus, ArrowLeftRight, ArrowUpDown, Undo, Redo, Settings, MoreHorizontal } from 'lucide-react';
 import { useLongPress } from '../hooks/useLongPress';
 import { exportToZip, exportToTxt } from '../lib/export';
 import { DebouncedInput, DebouncedTextarea } from './DebouncedInputs';
@@ -198,6 +198,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const [isChapterSelectMode, setIsChapterSelectMode] = useState(false);
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
   const [showVolumeSelectModal, setShowVolumeSelectModal] = useState(false);
+  const [showChapterMenu, setShowChapterMenu] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartRef = useRef<{x: number, y: number, time: number} | null>(null);
@@ -1743,28 +1744,39 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                 <div className="flex-1 flex flex-col relative pb-16">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="font-bold text-gray-700">章节列表</h2>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 items-center relative">
                       {isChapterSelectMode ? (
                         <button onClick={() => { setIsChapterSelectMode(false); setSelectedChapterIds([]); }} className="text-gray-500 hover:text-gray-700 text-sm font-medium">取消管理</button>
                       ) : (
                         <>
-                          <button onClick={() => setIsChapterSelectMode(true)} className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1">
-                            <CheckSquare size={16} /> 批量管理
-                          </button>
-                          <label className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 cursor-pointer" title="根据第几章的格式自动拆分多章">
-                            <Upload size={16} /> 导入拆分
-                            <input type="file" accept=".txt" className="hidden" onChange={handleImportFile} />
-                          </label>
-                          <label className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 cursor-pointer" title="直接作为一个章节导入">
-                            <Upload size={16} /> 导入单章
-                            <input type="file" accept=".txt" className="hidden" onChange={handleImportSingleChapter} />
-                          </label>
-                          <button onClick={() => createVolume(activeBook.id)} className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1">
+                          <button onClick={() => createVolume(activeBook.id)} className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-gray-200">
                             <FolderPlus size={16} /> 新建分卷
                           </button>
-                          <button onClick={() => createChapter(activeBook.id)} className="text-indigo-600 text-sm font-medium flex items-center gap-1">
+                          <button onClick={() => createChapter(activeBook.id)} className="text-indigo-600 hover:bg-indigo-50 text-sm font-medium flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-indigo-200">
                             <Plus size={16} /> 新建章节
                           </button>
+                          <button onClick={() => setShowChapterMenu(!showChapterMenu)} className="text-gray-500 hover:text-indigo-600 text-sm font-medium p-1.5 border border-gray-200 rounded-lg bg-white">
+                            <MoreHorizontal size={16} />
+                          </button>
+                          
+                          {showChapterMenu && (
+                             <>
+                               <div className="fixed inset-0 z-40" onClick={() => setShowChapterMenu(false)}></div>
+                               <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 min-w-[140px] z-50">
+                                 <button onClick={() => { setIsChapterSelectMode(true); setShowChapterMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                   <CheckSquare size={16} className="text-gray-400" /> 批量管理
+                                 </button>
+                                 <label className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
+                                   <Upload size={16} className="text-gray-400" /> 导入拆分
+                                   <input type="file" accept=".txt" className="hidden" onChange={(e) => { handleImportFile(e); setShowChapterMenu(false); }} />
+                                 </label>
+                                 <label className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
+                                   <Upload size={16} className="text-gray-400" /> 导入单章
+                                   <input type="file" accept=".txt" className="hidden" onChange={(e) => { handleImportSingleChapter(e); setShowChapterMenu(false); }} />
+                                 </label>
+                               </div>
+                             </>
+                          )}
                         </>
                       )}
                     </div>
