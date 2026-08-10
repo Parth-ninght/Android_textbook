@@ -202,7 +202,9 @@ export const exportToZip = async (data: {
 
           // Otherwise, proceed to generate the ZIP for standalone/WebView mode
           const zip = new JSZip();
-          const rootName = `Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
+          const rootName = data.books && data.books.length === 1 && !data.notes && !data.diaries && !data.noteFolders && !data.diaryFolders 
+              ? (data.books[0].title || '未命名作品')
+              : `Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
           const root = zip.folder(rootName);
           if (!root) throw new Error("无法初始化ZIP目录");
 
@@ -362,10 +364,10 @@ export const exportToZip = async (data: {
 
           try {
               if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                 desc.textContent = '压缩包已生成！如果您的系统拦截了下载，您可以尝试点击下方按钮通过原生分享将其发送到微信或保存至本地。';
+                 desc.textContent = '压缩包已生成！如果您的系统拦截了下载，您可以尝试点击下方按钮将其发送到微信或保存至本地。';
                  
                  const shareBtn = document.createElement('button');
-                 shareBtn.textContent = '尝试一键分享/保存 (原生能力)';
+                 shareBtn.textContent = '尝试一键分享/保存';
                  shareBtn.style.display = 'block';
                  shareBtn.style.backgroundColor = '#059669';
                  shareBtn.style.color = 'white';
@@ -418,12 +420,29 @@ export const exportToZip = async (data: {
       } catch (e) {
           title.textContent = '构建文件受阻或被拦截';
           title.style.color = '#dc2626';
-          desc.textContent = '您的 APP/手机 WebView 环境极为严格，屏蔽了底层的 ZIP 文件处理！这是第三方打包常常面临的情况，目前绝对安全的方案是点按复制纯文本导出。';
+          desc.textContent = '您的 APP/手机 WebView 环境极为严格，屏蔽了底层的 ZIP 文件处理！';
           
           createCopyFallback();
           createCloseBtn();
       }
   }, 50);
+};
+
+export const exportBookToTxt = async (book: Book) => {
+  let combinedContent = '';
+  if (book.chapters && book.chapters.length > 0) {
+      book.chapters.forEach((c) => {
+          if (c.isVolume) {
+              combinedContent += `\n==== ${c.title} ====\n\n\n`;
+          } else {
+              const chapterContent = c.content || '';
+              const chapterText = `${c.title}\n\n${chapterContent}`;
+              combinedContent += chapterText + '\n\n\n\n';
+          }
+      });
+  }
+  
+  await exportToTxt(`全本_${book.title || '未命名作品'}`, combinedContent.trim());
 };
 
 export const exportToTxt = async (titleStr: string, contentStr: string) => {

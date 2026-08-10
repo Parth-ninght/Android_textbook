@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
 import { Plus, ChevronLeft, Trash2, Book as BookIcon, EyeOff, Image as ImageIcon, CheckCircle2, Circle, Download, Upload, X, CheckSquare, BookOpen, Search, Edit3, List, Send, Moon, Sun, Type, Minus, ChevronRight, ArrowDownAZ, ArrowUpZA, FolderPlus, ArrowLeftRight, ArrowUpDown, Undo, Redo, Settings, MoreHorizontal } from 'lucide-react';
 import { useLongPress } from '../hooks/useLongPress';
-import { exportToZip, exportToTxt } from '../lib/export';
+import { exportToZip, exportToTxt, exportBookToTxt } from '../lib/export';
 import { DebouncedInput, DebouncedTextarea } from './DebouncedInputs';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -199,6 +199,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
   const [showVolumeSelectModal, setShowVolumeSelectModal] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const touchStartRef = useRef<{x: number, y: number, time: number} | null>(null);
@@ -1318,12 +1319,33 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
             </button>
             <h1 className={`text-sm font-medium ${textColor} truncate px-4 opacity-50`}>{activeBook.title}</h1>
             <div className="flex px-2">
-              <button 
-                onClick={() => exportToZip({ books: [activeBook] })} 
-                className={`p-3 ${mutedTextColor} hover:${textColor} rounded-full`}
-              >
-                <Download size={20} />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowExportMenu(!showExportMenu)} 
+                  className={`p-3 ${mutedTextColor} hover:${textColor} rounded-full`}
+                >
+                  <Download size={20} />
+                </button>
+                {showExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
+                    <div className="absolute right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 min-w-[140px] z-50">
+                      <button 
+                        onClick={() => { setShowExportMenu(false); exportToZip({ books: [activeBook] }); }} 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        导出为 ZIP
+                      </button>
+                      <button 
+                        onClick={() => { setShowExportMenu(false); exportBookToTxt(activeBook); }} 
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        导出全本 (TXT)
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
               <button onClick={() => { setIsOverviewTOCMode(true); setIsReaderSettingsOpen(false); }} className={`p-3 ${mutedTextColor} hover:${textColor} rounded-full`}>
                 <List size={20} />
               </button>
@@ -1582,9 +1604,31 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           </button>
           <h1 className="text-lg font-bold text-gray-800 truncate px-4">{activeBook.title}</h1>
           <div className="flex gap-2">
-            <button onClick={() => exportToZip({ books: [activeBook] })} className="p-2 text-gray-500 hover:text-indigo-600 rounded-full">
-              <Download size={20} />
-            </button>
+            <div className="relative">
+              <button onClick={() => setShowExportMenu(!showExportMenu)} className="p-2 text-gray-500 hover:text-indigo-600 rounded-full">
+                <Download size={20} />
+              </button>
+              
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
+                  <div className="absolute right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 min-w-[140px] z-50">
+                    <button 
+                      onClick={() => { setShowExportMenu(false); exportToZip({ books: [activeBook] }); }} 
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      导出为 ZIP
+                    </button>
+                    <button 
+                      onClick={() => { setShowExportMenu(false); exportBookToTxt(activeBook); }} 
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      导出全本 (TXT)
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={() => setIsSearchMode(true)} className="p-2 text-gray-500 hover:text-indigo-600 rounded-full">
               <Search size={20} />
             </button>
