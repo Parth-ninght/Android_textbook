@@ -205,8 +205,8 @@ export const exportToZip = async (data: {
           const rootName = data.books && data.books.length === 1 && !data.notes && !data.diaries && !data.noteFolders && !data.diaryFolders 
               ? (data.books[0].title || '未命名作品')
               : `Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
-          const root = zip.folder(rootName);
-          if (!root) throw new Error("无法初始化ZIP目录");
+          
+          const root = zip; // Put everything at root of ZIP to prevent deep nesting and fix backup.json path
 
           // Add raw JSON backup for easy importing to another device
           root.file('backup.json', JSON.stringify({
@@ -243,31 +243,55 @@ export const exportToZip = async (data: {
           }
 
           if (data.books && data.books.length > 0) {
-              const booksFolder = root.folder('作品');
+              const booksFolder = data.books.length > 1 ? root.folder('作品') : root;
               data.books.forEach(book => {
-                  const bookFolder = booksFolder?.folder(book.title || '未命名作品');
+                  const bookFolder = data.books.length > 1 ? booksFolder?.folder(book.title || '未命名作品') : booksFolder;
                   if (!bookFolder) return;
 
                   if (book.outlines && book.outlines.length > 0) {
                     const outlineFolder = bookFolder.folder('大纲');
+                    let currentOutVol = outlineFolder;
                     book.outlines.forEach(o => {
+                        if (o.isVolume) {
+                            currentOutVol = outlineFolder?.folder(o.title || '无标题分组') || outlineFolder;
+                            return;
+                        }
                         if (o.content && o.content.trim().length > 0) {
-                            outlineFolder?.file(`${o.title || '无标题'}.txt`, `${o.title}\n\n${o.content}`);
+                            currentOutVol?.file(`${o.title || '无标题'}.txt`, `${o.title}\n\n${o.content}`);
                         }
                     });
                   }
 
                   if (book.settings && book.settings.length > 0) {
                     const settingFolder = bookFolder.folder('设定');
+                    let currentSetVol = settingFolder;
                     book.settings.forEach(s => {
+                        if (s.isVolume) {
+                            currentSetVol = settingFolder?.folder(s.title || '无标题分组') || settingFolder;
+                            return;
+                        }
                         if (s.content && s.content.trim().length > 0) {
-                            settingFolder?.file(`${s.title || '无标题'}.txt`, `${s.title}\n\n${s.content}`);
+                            currentSetVol?.file(`${s.title || '无标题'}.txt`, `${s.title}\n\n${s.content}`);
+                        }
+                    });
+                  }
+                  
+                  if (book.characters && book.characters.length > 0) {
+                    const characterFolder = bookFolder.folder('角色');
+                    let currentCharVol = characterFolder;
+                    book.characters.forEach(c => {
+                        if (c.isVolume) {
+                            currentCharVol = characterFolder?.folder(c.title || '无标题分组') || characterFolder;
+                            return;
+                        }
+                        if (c.content && c.content.trim().length > 0) {
+                            currentCharVol?.file(`${c.title || '无标题'}.txt`, `${c.title}\n\n${c.content}`);
                         }
                     });
                   }
 
                   if (book.chapters && book.chapters.length > 0) {
-                      const contentFolder = bookFolder.folder('内容');
+                      const contentFolder = bookFolder.folder('正文');
                       let combinedContent = '';
                       let currentVolumeFolder = contentFolder;
                       
@@ -287,7 +311,7 @@ export const exportToZip = async (data: {
                               combinedContent += chapterText + '\n\n\n\n';
                           }
                       });
-                      contentFolder?.file(`全本_${book.title || '未命名作品'}.txt`, combinedContent.trim());
+                      bookFolder?.file(`全本_${book.title || '未命名作品'}.txt`, combinedContent.trim());
                   }
               });
           }
@@ -301,7 +325,7 @@ export const exportToZip = async (data: {
                 const result = await Filesystem.writeFile({
                   path: fileName,
                   data: base64Content,
-                  directory: Directory.Cache
+                  directory: Directory.Documents
                 });
 
                 title.textContent = '原生提取就绪 ✨';
@@ -364,10 +388,10 @@ export const exportToZip = async (data: {
 
           try {
               if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                 desc.textContent = '压缩包已生成！如果您的系统拦截了下载，您可以尝试点击下方按钮将其发送到微信或保存至本地。';
+                 desc.textContent = '压缩包已生成！如果您的系统拦截了下载，您可以尝试点击下方按钮通过原生分享将其发送到微信或保存至本地。';
                  
                  const shareBtn = document.createElement('button');
-                 shareBtn.textContent = '尝试一键分享/保存';
+                 shareBtn.textContent = '尝试一键分享/保存 (原生能力)';
                  shareBtn.style.display = 'block';
                  shareBtn.style.backgroundColor = '#059669';
                  shareBtn.style.color = 'white';
@@ -420,7 +444,7 @@ export const exportToZip = async (data: {
       } catch (e) {
           title.textContent = '构建文件受阻或被拦截';
           title.style.color = '#dc2626';
-          desc.textContent = '您的 APP/手机 WebView 环境极为严格，屏蔽了底层的 ZIP 文件处理！';
+          desc.textContent = '您的 APP/手机 WebView 环境极为严格，屏蔽了底层的 ZIP 文件处理！这是第三方打包常常面临的情况，目前绝对安全的方案是点按复制纯文本导出。';
           
           createCopyFallback();
           createCloseBtn();
@@ -454,7 +478,7 @@ export const exportToTxt = async (titleStr: string, contentStr: string) => {
       const result = await Filesystem.writeFile({
         path: fileName,
         data: fileContent,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
         encoding: Encoding.UTF8
       });
       await Share.share({

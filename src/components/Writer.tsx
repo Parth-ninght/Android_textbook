@@ -50,7 +50,7 @@ function BookItem({ book, isSelectMode, isSelected, onLongPress, onClick }: any)
   );
 }
 
-function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete, isDraggable = true, isSelectMode = false, isSelected = false }: { key?: React.Key, chapter: Chapter, index: number, onClick: () => void, onTitleChange?: (val: string) => void, onDelete?: () => void, isDraggable?: boolean, isSelectMode?: boolean, isSelected?: boolean }) {
+function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete, isDraggable = true, isSelectMode = false, isSelected = false, isCollapsed = false, onToggleCollapse }: { key?: React.Key, chapter: Chapter, index: number, onClick: () => void, onTitleChange?: (val: string) => void, onDelete?: () => void, isDraggable?: boolean, isSelectMode?: boolean, isSelected?: boolean, isCollapsed?: boolean, onToggleCollapse?: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: chapter.id, disabled: !isDraggable || isSelectMode });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const [isEditingVolume, setIsEditingVolume] = useState(false);
@@ -71,6 +71,12 @@ function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete,
         }}
       >
         <div className="flex-1 h-px bg-gray-200" />
+        <button
+          onClick={(e) => { e.stopPropagation(); if (onToggleCollapse) onToggleCollapse(); }}
+          className="text-gray-400 hover:text-gray-600 px-1"
+        >
+          <span className={`text-xs transition-transform inline-block ${isCollapsed ? '' : 'rotate-90'}`}>▶</span>
+        </button>
         {isEditingVolume && !isSelectMode ? (
           <input
             autoFocus
@@ -90,13 +96,13 @@ function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete,
             className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-32 text-center"
           />
         ) : (
-          <span className="text-sm font-bold text-gray-500 tracking-wider px-2">{chapter.title}</span>
+          <span className="text-sm font-bold text-gray-500 tracking-wider pr-2">{chapter.title}</span>
         )}
         <div className="flex-1 h-px bg-gray-200" />
         {!isSelectMode && onDelete && (
            <button 
              onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-             className="absolute right-0 p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity"
+             className="absolute right-0 p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
              title="删除分卷"
            >
              <Trash2 size={14} />
@@ -149,6 +155,122 @@ const highlightText = (text: string, query: string) => {
   );
 };
 
+function DocItemList({ items, title, emptyText, onAddGroup, onAddItem, onSelect, activeId, updateItem, deleteItem, type }: { items: DocItem[], title: string, emptyText: string, onAddGroup: () => void, onAddItem: () => void, onSelect: (id: string) => void, activeId: string | null, updateItem: (id: string, updates: Partial<DocItem>) => void, deleteItem: (id: string) => void, type: string }) {
+  const [collapsedVolumes, setCollapsedVolumes] = useState<Set<string>>(new Set());
+  const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
+
+  const toggleVolume = (volumeId: string) => {
+    setCollapsedVolumes(prev => {
+      const next = new Set(prev);
+      if (next.has(volumeId)) next.delete(volumeId);
+      else next.add(volumeId);
+      return next;
+    });
+  };
+
+  let currentVolId = 'default';
+  const visibleItems = items.filter(c => {
+    if (c.isVolume) {
+      currentVolId = c.id;
+      return true;
+    }
+    return !collapsedVolumes.has(currentVolId);
+  });
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="font-bold text-gray-700">{title}</h2>
+        <div className="flex gap-2">
+          <button onClick={onAddGroup} className="text-gray-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-gray-200">
+            <FolderPlus size={16} /> 新建分组
+          </button>
+          <button onClick={onAddItem} className="text-indigo-600 hover:bg-indigo-50 text-sm font-medium flex items-center gap-1 bg-white px-2 py-1.5 rounded-lg border border-indigo-200">
+            <Plus size={16} /> 新建内容
+          </button>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        {(!items || items.length === 0) ? (
+          <div className="text-center text-gray-400 py-10">{emptyText}</div>
+        ) : (
+          visibleItems.map((item) => {
+            if (item.isVolume) {
+              const isCollapsed = collapsedVolumes.has(item.id);
+              return (
+                <div
+                  key={item.id}
+                  className="mt-6 mb-2 flex items-center gap-2 group cursor-pointer relative"
+                  onClick={() => {
+                    if (editingVolumeId !== item.id) setEditingVolumeId(item.id);
+                  }}
+                >
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleVolume(item.id); }}
+                    className="text-gray-400 hover:text-gray-600 px-1"
+                  >
+                    <span className={`text-xs transition-transform inline-block ${isCollapsed ? '' : 'rotate-90'}`}>▶</span>
+                  </button>
+                  {editingVolumeId === item.id ? (
+                    <input
+                      autoFocus
+                      type="text"
+                      defaultValue={item.title}
+                      onBlur={(e) => {
+                        updateItem(item.id, { title: e.target.value });
+                        setEditingVolumeId(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          updateItem(item.id, { title: (e.target as HTMLInputElement).value });
+                          setEditingVolumeId(null);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-32 text-center"
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-gray-500 tracking-wider pr-2">{item.title}</span>
+                  )}
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} 
+                    className="absolute right-0 p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
+                    title="删除分卷"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            }
+            return (
+              <div
+                key={item.id}
+                onClick={() => onSelect(item.id)}
+                className={`bg-white p-4 rounded-lg shadow-sm border flex justify-between items-center cursor-pointer active:scale-[0.98] transition-transform group ${activeId === item.id ? 'border-indigo-500 bg-indigo-50/30' : 'border-gray-100'}`}
+              >
+                <div className="flex-1 truncate pr-4">
+                  <span className="font-medium text-gray-800">{item.title || '无标题'}</span>
+                  <p className="text-xs text-gray-400 mt-1 truncate">{item.content || '空'}</p>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} 
+                  className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
+                  title="删除"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function WriterTab({ setIsEditing, settings, onOpenSettings, isActiveTab = true }: WriterProps) {
   const [books, setBooks] = useLocalStorage<Book[]>('app_books', []);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
@@ -156,18 +278,54 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
   const [activeSettingId, setActiveSettingId] = useState<string | null>(null);
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [isImmersive, setIsImmersive] = useLocalStorage('writer_isImmersive', false);
   const [isOverviewMode, setIsOverviewMode] = useLocalStorage('writer_isOverviewMode', false);
-  const [isOverviewTOCMode, setIsOverviewTOCMode] = useLocalStorage('writer_isOverviewTOCMode', false);
+  const [editorDrawerTab, setEditorDrawerTab] = useState<'chapters' | 'outlines' | 'characters' | 'settings' | 'drafts' | null>(null);
   const [isSearchMode, setIsSearchMode] = useLocalStorage('writer_isSearchMode', false);
   const [searchQuery, setSearchQuery] = useLocalStorage('writer_searchQuery', '');
   const [searchSortMode, setSearchSortMode] = useLocalStorage<'comprehensive' | 'most_mentioned' | 'chapter_order'>('writer_searchSortMode', 'comprehensive');
   const [visibleChapterId, setVisibleChapterId] = useLocalStorage<string | null>('writer_visibleChapterId', null);
-  const [bookTab, setBookTab] = useLocalStorage<'chapters' | 'drafts' | 'outlines' | 'settings'>('writer_bookTab', 'chapters');
+  const [bookTab, setBookTab] = useLocalStorage<'chapters' | 'drafts' | 'outlines' | 'settings' | 'characters'>('writer_bookTab', 'chapters');
   const overviewScrollRef = useRef<HTMLDivElement>(null);
   const chapterListScrollRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef<Record<string, number>>({});
   
+  useEffect(() => {
+    setBooks(prev => {
+      let changed = false;
+      const newBooks = prev.map(book => {
+        let bookChanged = false;
+        const newBook = { ...book };
+        
+        const collections = [
+          { key: 'chapters', defaultTitle: '第一卷' },
+          { key: 'outlines', defaultTitle: '默认大纲' },
+          { key: 'characters', defaultTitle: '主要角色' },
+          { key: 'settings', defaultTitle: '默认设定' }
+        ] as const;
+
+        collections.forEach(({ key, defaultTitle }) => {
+          const items = newBook[key] || [];
+          if (items.length > 0) {
+            const hasVolume = items.some((i: any) => i.isVolume);
+            if (!hasVolume || !items[0].isVolume) {
+              (newBook as any)[key] = [
+                { id: uuidv4(), title: defaultTitle, content: '', wordCount: 0, updatedAt: Date.now(), isVolume: true },
+                ...items
+              ];
+              bookChanged = true;
+            }
+          }
+        });
+        
+        if (bookChanged) changed = true;
+        return newBook;
+      });
+      return changed ? newBooks : prev;
+    });
+  }, [setBooks]);
+
   useEffect(() => {
     if (activeBookId && !activeChapterId && bookTab === 'chapters') {
       const savedPos = scrollPosRef.current[activeBookId];
@@ -189,6 +347,16 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const [totalPages, setTotalPages] = useState(1);
   const [chapterSearchQuery, setChapterSearchQuery] = useState('');
   const [chapterSortOrder, setChapterSortOrder] = useState<'asc'|'desc'>('asc');
+  const [collapsedVolumes, setCollapsedVolumes] = useState<Set<string>>(new Set());
+
+  const toggleVolume = (volumeId: string) => {
+    setCollapsedVolumes(prev => {
+      const next = new Set(prev);
+      if (next.has(volumeId)) next.delete(volumeId);
+      else next.add(volumeId);
+      return next;
+    });
+  };
   
   const [readerSettings, setReaderSettings] = useLocalStorage<{theme: 'light' | 'dark', fontSize: number, mode?: 'h-flip' | 'v-scroll'}>('reader_settings', { theme: 'light', fontSize: 18, mode: 'h-flip' });
 
@@ -218,6 +386,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const activeDraft = activeBook?.drafts?.find(d => d.id === activeDraftId);
   const activeOutline = activeBook?.outlines?.find(o => o.id === activeOutlineId);
   const activeSetting = activeBook?.settings?.find(s => s.id === activeSettingId);
+  const activeCharacter = activeBook?.characters?.find(c => c.id === activeCharacterId);
 
   const handleExitChapter = () => {
     if (activeChapter && (!activeChapter.title.trim() || activeChapter.title.match(/^第\s*[0-9一二三四五六七八九十百千万零两]+\s*章$/) || activeChapter.title === '新分卷') && !activeChapter.content.trim()) {
@@ -234,17 +403,24 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   };
 
   const handleExitOutline = () => {
-    if (activeOutline && (!activeOutline.title.trim() || activeOutline.title === '新大纲') && !activeOutline.content.trim()) {
+    if (activeOutline && (!activeOutline.title.trim() || activeOutline.title === '新大纲' || activeOutline.title === '新大纲卷') && !activeOutline.content.trim()) {
       setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, outlines: (b.outlines || []).filter(o => o.id !== activeOutlineId) } : b));
     }
     setActiveOutlineId(null);
   };
 
   const handleExitSetting = () => {
-    if (activeSetting && (!activeSetting.title.trim() || activeSetting.title === '新设定') && !activeSetting.content.trim()) {
+    if (activeSetting && (!activeSetting.title.trim() || activeSetting.title === '新设定' || activeSetting.title === '新设定卷') && !activeSetting.content.trim()) {
       setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, settings: (b.settings || []).filter(s => s.id !== activeSettingId) } : b));
     }
     setActiveSettingId(null);
+  };
+
+  const handleExitCharacter = () => {
+    if (activeCharacter && (!activeCharacter.title.trim() || activeCharacter.title === '新角色' || activeCharacter.title === '新角色卷') && !activeCharacter.content.trim()) {
+      setBooks(prev => prev.map(b => b.id === activeBookId ? { ...b, characters: (b.characters || []).filter(c => c.id !== activeCharacterId) } : b));
+    }
+    setActiveCharacterId(null);
   };
 
   useHardwareBack(isActiveTab && activeBookId !== null, () => handleExitBook());
@@ -252,9 +428,10 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   useHardwareBack(isActiveTab && activeDraftId !== null, handleExitDraft);
   useHardwareBack(isActiveTab && activeOutlineId !== null, handleExitOutline);
   useHardwareBack(isActiveTab && activeSettingId !== null, handleExitSetting);
+  useHardwareBack(isActiveTab && activeCharacterId !== null, handleExitCharacter);
   useHardwareBack(isActiveTab && isImmersive, () => setIsImmersive(false));
-  useHardwareBack(isActiveTab && isOverviewTOCMode, () => {
-    setIsOverviewTOCMode(false);
+  useHardwareBack(isActiveTab && editorDrawerTab !== null, () => {
+    setEditorDrawerTab(null);
   });
   useHardwareBack(isActiveTab && isOverviewMode, () => {
     setIsOverviewMode(false);
@@ -362,11 +539,23 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
       const text = await file.text();
       let title = file.name.replace(/\.txt$/i, '');
       
+      const formattedContent = text
+        .split('\n')
+        .map(line => {
+          const trimmed = line.trim();
+          if (trimmed.length > 0) {
+            return '    ' + trimmed;
+          }
+          return line;
+        })
+        .join('\n')
+        .trim();
+      
       const newChapter: Chapter = {
          id: uuidv4(),
          title: title || '导入章节',
-         content: text.trim(),
-         wordCount: text.trim().length,
+         content: formattedContent,
+         wordCount: formattedContent.replace(/\s/g, '').length,
          updatedAt: Date.now()
       };
       
@@ -431,6 +620,16 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
         let currentContent: string[] = [];
         let foundChapters = false;
         
+        const formatContent = (c: string) => {
+            return c.split('\n').map(line => {
+                const trimmed = line.trim();
+                if (trimmed.length > 0) {
+                    return '    ' + trimmed;
+                }
+                return line;
+            }).join('\n').trimEnd();
+        };
+        
         for (let i = 0; i < linesToProcess.length; i++) {
            const line = linesToProcess[i];
            if (chapterPattern.test(line) || volumePattern.test(line)) {
@@ -445,11 +644,12 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                     actualTitle = title || '前言';
                  }
                  
+                 const formatted = isVol ? '' : formatContent(contentStr);
                  importedChapters.push({
                    id: uuidv4(),
                    title: actualTitle,
-                   content: isVol ? '' : contentStr,
-                   wordCount: isVol ? 0 : contentStr.length,
+                   content: formatted,
+                   wordCount: isVol ? 0 : formatted.replace(/\s/g, '').length,
                    updatedAt: Date.now(),
                    isVolume: isVol || undefined
                  });
@@ -473,11 +673,12 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                 }
                 
                 if (actualTitle !== (title || '前言') || contentStr.length > 0) {
+                    const formatted = isVol ? '' : formatContent(contentStr);
                     importedChapters.push({
                       id: uuidv4(),
                       title: actualTitle,
-                      content: isVol ? '' : contentStr,
-                      wordCount: isVol ? 0 : contentStr.length,
+                      content: formatted,
+                      wordCount: isVol ? 0 : formatted.replace(/\s/g, '').length,
                       updatedAt: Date.now(),
                       isVolume: isVol || undefined
                     });
@@ -491,22 +692,23 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                     const lines = chunk.trim().split('\n');
                     const chapTitle = lines[0].trim();
                      // find first non-empty line after title for content start, but simple slice(1) works because we trim
-                    const chapContent = lines.slice(1).join('\n').trim();
+                    const chapContent = formatContent(lines.slice(1).join('\n').trim());
                     importedChapters.push({
                        id: uuidv4(),
                        title: chapTitle || `第${index + 1}章`,
                        content: chapContent,
-                       wordCount: chapContent.length,
+                       wordCount: chapContent.replace(/\s/g, '').length,
                        updatedAt: Date.now()
                     });
                  }
               });
            } else {
+              const formattedContent = formatContent(linesToProcess.join('\n').trim());
               importedChapters.push({
                  id: uuidv4(),
                  title: title || '导入章节',
-                 content: linesToProcess.join('\n').trim(),
-                 wordCount: linesToProcess.join('\n').trim().length,
+                 content: formattedContent,
+                 wordCount: formattedContent.replace(/\s/g, '').length,
                  updatedAt: Date.now()
               });
            }
@@ -585,7 +787,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     setActiveOutlineId(null);
     setActiveSettingId(null);
     setIsOverviewMode(false);
-    setIsOverviewTOCMode(false);
+    setEditorDrawerTab(null);
     setIsSearchMode(false);
   };
 
@@ -651,7 +853,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     setActiveSettingId(null);
     setIsImmersive(false);
     setIsOverviewMode(false);
-    setIsOverviewTOCMode(false);
+    setEditorDrawerTab(null);
     setIsSearchMode(false);
   };
 
@@ -741,6 +943,19 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     const book = books.find(b => b.id === bookId);
     if (!book) return;
 
+    let newChapters = [...book.chapters];
+    const hasVolume = newChapters.some(c => c.isVolume);
+    if (!hasVolume) {
+      newChapters.push({
+        id: uuidv4(),
+        title: '第一卷',
+        content: '',
+        wordCount: 0,
+        updatedAt: Date.now(),
+        isVolume: true
+      });
+    }
+
     const newChapter: Chapter = {
       id: uuidv4(),
       title: getNextChapterTitle(book),
@@ -748,7 +963,9 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
       wordCount: 0,
       updatedAt: Date.now(),
     };
-    setBooks(books.map(b => b.id === bookId ? { ...b, chapters: [...b.chapters, newChapter], updatedAt: Date.now() } : b));
+    newChapters.push(newChapter);
+
+    setBooks(books.map(b => b.id === bookId ? { ...b, chapters: newChapters, updatedAt: Date.now() } : b));
     setActiveChapterId(newChapter.id);
   };
 
@@ -851,19 +1068,44 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     setBookTab('chapters');
   };
 
-  const createDocItem = (bookId: string, type: 'outlines' | 'settings') => {
+  const createDocItem = (bookId: string, type: 'outlines' | 'settings' | 'characters', isVolume: boolean = false) => {
+    const book = books.find(b => b.id === bookId);
+    if (!book) return;
+
+    let items = [...(book[type] || [])];
+    
+    if (!isVolume) {
+      const hasVolume = items.some(i => i.isVolume);
+      if (!hasVolume) {
+        items.push({
+          id: uuidv4(),
+          title: type === 'outlines' ? '默认大纲' : (type === 'settings' ? '默认设定' : '主要角色'),
+          content: '',
+          updatedAt: Date.now(),
+          isVolume: true
+        });
+      }
+    }
+
     const newItem: DocItem = {
       id: uuidv4(),
-      title: type === 'outlines' ? '新大纲' : '新设定',
+      title: type === 'outlines' ? (isVolume ? '新大纲卷' : '新大纲') : (type === 'settings' ? (isVolume ? '新设定卷' : '新设定') : (isVolume ? '新角色卷' : '新角色')),
       content: '',
       updatedAt: Date.now(),
+      isVolume: isVolume
     };
-    setBooks(books.map(b => b.id === bookId ? { ...b, [type]: [...(b[type] || []), newItem], updatedAt: Date.now() } : b));
-    if (type === 'outlines') setActiveOutlineId(newItem.id);
-    else setActiveSettingId(newItem.id);
+    
+    items.push(newItem);
+
+    setBooks(books.map(b => b.id === bookId ? { ...b, [type]: items, updatedAt: Date.now() } : b));
+    if (!isVolume) {
+        if (type === 'outlines') setActiveOutlineId(newItem.id);
+        else if (type === 'settings') setActiveSettingId(newItem.id);
+        else setActiveCharacterId(newItem.id);
+    }
   };
 
-  const updateDocItem = (bookId: string, type: 'outlines' | 'settings', itemId: string, updates: Partial<DocItem>) => {
+  const updateDocItem = (bookId: string, type: 'outlines' | 'settings' | 'characters', itemId: string, updates: Partial<DocItem>) => {
     setBooks(books.map(b => {
       if (b.id !== bookId) return b;
       const updatedItems = (b[type] || []).map(item => item.id === itemId ? { ...item, ...updates, updatedAt: Date.now() } : item);
@@ -871,10 +1113,66 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     }));
   };
 
-  const deleteDocItem = (bookId: string, type: 'outlines' | 'settings', itemId: string) => {
+  const deleteDocItem = (bookId: string, type: 'outlines' | 'settings' | 'characters', itemId: string) => {
     setBooks(books.map(b => b.id === bookId ? { ...b, [type]: (b[type] || []).filter(item => item.id !== itemId), updatedAt: Date.now() } : b));
     if (type === 'outlines') setActiveOutlineId(null);
-    else setActiveSettingId(null);
+    else if (type === 'settings') setActiveSettingId(null);
+    else setActiveCharacterId(null);
+  };
+
+  const renderDrawerGroupedList = (items: any[], activeId: string | null, onItemClick: (item: any) => void) => {
+    const chunks: { volume: any | null, items: any[] }[] = [];
+    let currentChunk: { volume: any | null, items: any[] } = { volume: null, items: [] };
+    items.forEach(item => {
+      if (item.isVolume) {
+        if (currentChunk.volume !== null || currentChunk.items.length > 0) {
+          chunks.push(currentChunk);
+        }
+        currentChunk = { volume: item, items: [] };
+      } else {
+        currentChunk.items.push(item);
+      }
+    });
+    if (currentChunk.volume !== null || currentChunk.items.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks.map((chunk, chunkIdx) => (
+      <div key={chunk.volume ? chunk.volume.id : `chunk-${chunkIdx}`} className="mb-2">
+        {chunk.volume && (
+          <details open className="group">
+            <summary className="flex items-center px-4 py-2 bg-gray-50/50 cursor-pointer list-none select-none border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 text-xs transition-transform group-open:rotate-90">▶</span>
+                <span className="font-bold text-gray-800 text-sm">{chunk.volume.title} <span className="text-gray-400 font-normal">({chunk.items.length})</span></span>
+              </div>
+            </summary>
+            <div>
+              {chunk.items.map((item, index) => (
+                <button
+                  key={item.id}
+                  onClick={() => onItemClick(item)}
+                  className={`w-full text-left px-8 py-3 text-sm transition-colors border-b border-gray-50 last:border-0 truncate ${activeId === item.id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+                >
+                  <span className="text-gray-400 mr-2">{index + 1}.</span>
+                  {item.title}
+                </button>
+              ))}
+            </div>
+          </details>
+        )}
+        {!chunk.volume && chunk.items.map((item, index) => (
+          <button
+            key={item.id}
+            onClick={() => onItemClick(item)}
+            className={`w-full text-left px-4 py-3 text-sm transition-colors border-b border-gray-50 last:border-0 truncate ${activeId === item.id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+          >
+            <span className="text-gray-400 mr-2">{index + 1}.</span>
+            {item.title}
+          </button>
+        ))}
+      </div>
+    ));
   };
 
   // Chapter Editor
@@ -1099,19 +1397,21 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           <DebouncedInput
             key={`title-${activeOutline.id}`}
             type="text"
-            placeholder="大纲标题"
+            placeholder={activeOutline.isVolume ? "大纲分组名称" : "大纲标题"}
             defaultValue={activeOutline.title}
             onChange={value => updateDocItem(activeBookId, 'outlines', activeOutline.id, { title: value })}
             className="text-2xl font-bold border-none outline-none mb-6 placeholder-gray-300"
           />
-          <DebouncedTextarea
-            ref={editorTextareaRef}
-            key={`content-${activeOutline.id}`}
-            placeholder="记录大纲内容..."
-            defaultValue={activeOutline.content}
-            onChange={value => updateDocItem(activeBookId, 'outlines', activeOutline.id, { content: value })}
-            className="flex-1 w-full resize-none border-none outline-none leading-loose text-lg text-gray-700 placeholder-gray-300"
-          />
+          {!activeOutline.isVolume && (
+            <DebouncedTextarea
+              ref={editorTextareaRef}
+              key={`content-${activeOutline.id}`}
+              placeholder="记录大纲内容..."
+              defaultValue={activeOutline.content}
+              onChange={value => updateDocItem(activeBookId, 'outlines', activeOutline.id, { content: value })}
+              className="flex-1 w-full resize-none border-none outline-none leading-loose text-lg text-gray-700 placeholder-gray-300"
+            />
+          )}
         </div>
       </div>
     );
@@ -1141,19 +1441,65 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           <DebouncedInput
             key={`title-${activeSetting.id}`}
             type="text"
-            placeholder="设定标题"
+            placeholder={activeSetting.isVolume ? "设定分组名称" : "设定标题"}
             defaultValue={activeSetting.title}
             onChange={value => updateDocItem(activeBookId, 'settings', activeSetting.id, { title: value })}
             className="text-2xl font-bold border-none outline-none mb-6 placeholder-gray-300"
           />
-          <DebouncedTextarea
-            ref={editorTextareaRef}
-            key={`content-${activeSetting.id}`}
-            placeholder="记录设定内容..."
-            defaultValue={activeSetting.content}
-            onChange={value => updateDocItem(activeBookId, 'settings', activeSetting.id, { content: value })}
-            className="flex-1 w-full resize-none border-none outline-none leading-loose text-lg text-gray-700 placeholder-gray-300"
+          {!activeSetting.isVolume && (
+            <DebouncedTextarea
+              ref={editorTextareaRef}
+              key={`content-${activeSetting.id}`}
+              placeholder="记录设定内容..."
+              defaultValue={activeSetting.content}
+              onChange={value => updateDocItem(activeBookId, 'settings', activeSetting.id, { content: value })}
+              className="flex-1 w-full resize-none border-none outline-none leading-loose text-lg text-gray-700 placeholder-gray-300"
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Character Editor
+  if (activeBookId && activeCharacterId && activeCharacter) {
+    return (
+      <div className="flex flex-col h-full bg-white text-gray-800">
+        <div className="flex items-center justify-between p-4 border-b">
+          <button onClick={handleExitCharacter} className="p-2 -ml-2 text-gray-600">
+            <ChevronLeft size={24} />
+          </button>
+          <div className="flex items-center gap-4">
+             <button onClick={() => handleEditorAction('undo')} className="p-2 text-gray-600 hover:text-indigo-600" title="撤销">
+               <Undo size={20} />
+             </button>
+             <button onClick={() => handleEditorAction('redo')} className="p-2 text-gray-600 hover:text-indigo-600" title="重做">
+               <Redo size={20} />
+             </button>
+             <button onClick={() => deleteDocItem(activeBookId, 'characters', activeCharacter.id)} className="p-2 -mr-2 text-red-500">
+               <Trash2 size={20} />
+             </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col max-w-3xl mx-auto w-full">
+          <DebouncedInput
+            key={`title-${activeCharacter.id}`}
+            type="text"
+            placeholder={activeCharacter.isVolume ? "角色分组名称" : "角色名称"}
+            defaultValue={activeCharacter.title}
+            onChange={value => updateDocItem(activeBookId, 'characters', activeCharacter.id, { title: value })}
+            className="text-2xl font-bold border-none outline-none mb-6 placeholder-gray-300"
           />
+          {!activeCharacter.isVolume && (
+            <DebouncedTextarea
+              ref={editorTextareaRef}
+              key={`content-${activeCharacter.id}`}
+              placeholder="记录角色档案、性格、背景等..."
+              defaultValue={activeCharacter.content}
+              onChange={value => updateDocItem(activeBookId, 'characters', activeCharacter.id, { content: value })}
+              className="flex-1 w-full resize-none border-none outline-none leading-loose text-lg text-gray-700 placeholder-gray-300"
+            />
+          )}
         </div>
       </div>
     );
@@ -1346,7 +1692,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                   </>
                 )}
               </div>
-              <button onClick={() => { setIsOverviewTOCMode(true); setIsReaderSettingsOpen(false); }} className={`p-3 ${mutedTextColor} hover:${textColor} rounded-full`}>
+              <button onClick={() => { setEditorDrawerTab('chapters'); setIsReaderSettingsOpen(false); }} className={`p-3 ${mutedTextColor} hover:${textColor} rounded-full`}>
                 <List size={20} />
               </button>
               <button 
@@ -1549,43 +1895,80 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
              </div>
           </div>
 
-          {/* Overview TOC Drawer */}
-          {isOverviewTOCMode && (
-            <div className="absolute inset-0 z-[60] bg-black/60 flex justify-end">
-              <div className={`w-64 ${navBgColor} h-full flex flex-col shadow-2xl animate-in slide-in-from-right`}>
-                <div className={`p-4 border-b ${borderColor} flex justify-between items-center`}>
-                  <h2 className={`font-bold ${textColor}`}>目录</h2>
-                  <button onClick={() => setIsOverviewTOCMode(false)} className={`p-1 ${mutedTextColor} hover:bg-gray-200 rounded-full dark:hover:bg-gray-700`}>
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                  {activeBook.chapters.map((chapter, index) => (
-                    <button
-                      key={chapter.id}
-                      onClick={() => {
-                        setIsOverviewTOCMode(false);
-                        const el = overviewScrollRef.current?.querySelector(`[data-chapter-id="${chapter.id}"]`);
-                        if (el && overviewScrollRef.current) {
-                          el.scrollIntoView({ behavior: 'instant', block: 'start', inline: 'start' });
-                          setTimeout(() => {
-                            if (overviewScrollRef.current && readerSettings.mode !== 'v-scroll') {
-                               const page = Math.floor(overviewScrollRef.current.scrollLeft / overviewScrollRef.current.clientWidth) + 1;
-                               setCurrentPage(page);
-                            }
-                          }, 10);
-                        }
-                      }}
-                      className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors ${
-                        visibleChapterId === chapter.id ? (isDark ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-700 font-medium') : `${textColor} hover:bg-gray-100 dark:hover:bg-gray-700`
-                      }`}
-                    >
-                      <span className={`${mutedTextColor} mr-2`}>{(chapter as any).isVolume ? '' : index + 1 + '.'}</span>
-                      <span className={`truncate ${(chapter as any).isVolume ? 'font-bold' : ''}`}>{chapter.title}</span>
-                    </button>
-                  ))}
+          {/* Editor Drawer Modal */}
+          {editorDrawerTab && (
+            <div className="absolute inset-x-0 bottom-0 top-12 z-[60] bg-white rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col animate-in slide-in-from-bottom duration-200">
+              <div className="flex items-center px-2 py-2 border-b border-gray-100">
+                <button onClick={() => setEditorDrawerTab(null)} className="p-3 text-gray-500 hover:bg-gray-100 rounded-full">
+                  <X size={24} />
+                </button>
+                <div className="flex-1 flex overflow-x-auto hide-scrollbar px-2 gap-4">
+                  {['chapters', 'outlines', 'characters', 'settings', 'drafts'].map((tab) => {
+                    const tabNames = { chapters: '章节', outlines: '大纲', characters: '角色', settings: '设定', drafts: '便签' };
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => setEditorDrawerTab(tab as any)}
+                        className={`px-3 py-3 text-base whitespace-nowrap font-bold transition-colors border-b-4 ${
+                          editorDrawerTab === tab ? 'border-indigo-600 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 font-medium'
+                        }`}
+                      >
+                        {tabNames[tab as keyof typeof tabNames]}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+              <div className="flex-1 overflow-y-auto bg-white p-2">
+                {editorDrawerTab === 'chapters' && renderDrawerGroupedList(activeBook.chapters, activeChapterId, (c) => {
+                  setEditorDrawerTab(null);
+                  setActiveChapterId(c.id);
+                })}
+                {editorDrawerTab === 'outlines' && renderDrawerGroupedList(activeBook.outlines || [], activeOutlineId, (o) => {
+                  setEditorDrawerTab(null);
+                  setActiveOutlineId(o.id);
+                })}
+                {editorDrawerTab === 'characters' && renderDrawerGroupedList(activeBook.characters || [], activeCharacterId, (c) => {
+                  setEditorDrawerTab(null);
+                  setActiveCharacterId(c.id);
+                })}
+                {editorDrawerTab === 'settings' && renderDrawerGroupedList(activeBook.settings || [], activeSettingId, (s) => {
+                  setEditorDrawerTab(null);
+                  setActiveSettingId(s.id);
+                })}
+                {editorDrawerTab === 'drafts' && renderDrawerGroupedList(activeBook.drafts || [], activeDraftId, (d) => {
+                  setEditorDrawerTab(null);
+                  setActiveDraftId(d.id);
+                })}
+              </div>
+              
+              {editorDrawerTab !== 'drafts' && (
+                <button 
+                  onClick={() => {
+                    if (editorDrawerTab === 'chapters') createVolume(activeBook.id);
+                    else if (editorDrawerTab === 'outlines') { createDocItem(activeBook.id, 'outlines', true); setEditorDrawerTab(null); }
+                    else if (editorDrawerTab === 'characters') { createDocItem(activeBook.id, 'characters', true); setEditorDrawerTab(null); }
+                    else if (editorDrawerTab === 'settings') { createDocItem(activeBook.id, 'settings', true); setEditorDrawerTab(null); }
+                  }} 
+                  className="absolute bottom-24 right-6 p-3 bg-white text-indigo-600 rounded-full shadow-lg border border-indigo-100 hover:bg-indigo-50 transition-colors"
+                  title="新建分组"
+                >
+                  <FolderPlus size={20} />
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (editorDrawerTab === 'chapters') createChapter(activeBook.id);
+                  else if (editorDrawerTab === 'outlines') { createDocItem(activeBook.id, 'outlines'); setEditorDrawerTab(null); }
+                  else if (editorDrawerTab === 'characters') { createDocItem(activeBook.id, 'characters'); setEditorDrawerTab(null); }
+                  else if (editorDrawerTab === 'settings') { createDocItem(activeBook.id, 'settings'); setEditorDrawerTab(null); }
+                  else if (editorDrawerTab === 'drafts') { createDraft(activeBook.id); setEditorDrawerTab(null); }
+                }} 
+                className="absolute bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-colors"
+                title="新建内容"
+              >
+                <Plus size={24} />
+              </button>
             </div>
           )}
 
@@ -1710,6 +2093,12 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
               大纲
             </button>
             <button
+              onClick={() => setBookTab('characters')}
+              className={`pb-2 px-4 text-sm font-medium transition-colors whitespace-nowrap ${bookTab === 'characters' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              角色
+            </button>
+            <button
               onClick={() => setBookTab('settings')}
               className={`pb-2 px-4 text-sm font-medium transition-colors whitespace-nowrap ${bookTab === 'settings' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
@@ -1728,14 +2117,23 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           >
             {bookTab === 'chapters' && (() => {
               // Sorting logic
-              let displayChapters = [...activeBook.chapters];
+              let currentVolId = 'default';
+              const visibleChapters = activeBook.chapters.filter(c => {
+                if (c.isVolume) {
+                  currentVolId = c.id;
+                  return true;
+                }
+                return !collapsedVolumes.has(currentVolId);
+              });
+
+              let displayChapters = [...visibleChapters];
               if (chapterSearchQuery) {
-                displayChapters = displayChapters.filter(c => c.title.toLowerCase().includes(chapterSearchQuery.toLowerCase()));
+                displayChapters = activeBook.chapters.filter(c => c.title.toLowerCase().includes(chapterSearchQuery.toLowerCase()));
               } else if (chapterSortOrder === 'desc') {
                 const chunks: { volume: Chapter | null, items: Chapter[] }[] = [];
                 let currentChunk: { volume: Chapter | null, items: Chapter[] } = { volume: null, items: [] };
 
-                displayChapters.forEach(c => {
+                visibleChapters.forEach(c => {
                   if (c.isVolume) {
                     if (currentChunk.volume !== null || currentChunk.items.length > 0) {
                       chunks.push(currentChunk);
@@ -1859,9 +2257,10 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                       <div className="text-center text-gray-400 py-10">未找到章节</div>
                     ) : isDndEnabled ? (
                       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChapterDragEnd}>
-                        <SortableContext items={activeBook.chapters.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                          {activeBook.chapters.map((chapter, index) => {
-                            const chapterNum = activeBook.chapters.filter((c, i) => i <= index && !c.isVolume).length;
+                        <SortableContext items={visibleChapters.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                          {visibleChapters.map((chapter) => {
+                            const origIndex = activeBook.chapters.findIndex(c => c.id === chapter.id);
+                            const chapterNum = activeBook.chapters.filter((c, i) => i <= origIndex && !c.isVolume).length;
                             return (
                             <SortableChapterItem
                               key={chapter.id}
@@ -1879,13 +2278,15 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                               isDraggable={true}
                               isSelectMode={isChapterSelectMode}
                               isSelected={selectedChapterIds.includes(chapter.id)}
+                              isCollapsed={collapsedVolumes.has(chapter.id)}
+                              onToggleCollapse={() => toggleVolume(chapter.id)}
                             />
                           )})}
                         </SortableContext>
                       </DndContext>
                     ) : (
                       <div>
-                          {displayChapters.map((chapter, index) => {
+                          {displayChapters.map((chapter) => {
                             const origIndex = activeBook.chapters.findIndex(c => c.id === chapter.id);
                             const chapterNum = activeBook.chapters.filter((c, i) => i <= origIndex && !c.isVolume).length;
                             return (
@@ -1905,6 +2306,8 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                               isDraggable={false}
                               isSelectMode={isChapterSelectMode}
                               isSelected={selectedChapterIds.includes(chapter.id)}
+                              isCollapsed={collapsedVolumes.has(chapter.id)}
+                              onToggleCollapse={() => toggleVolume(chapter.id)}
                             />
                           )})}
                       </div>
@@ -1986,63 +2389,47 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
           )}
 
           {bookTab === 'outlines' && (
-            <div className="flex-1 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-gray-700">大纲列表</h2>
-                <button onClick={() => createDocItem(activeBook.id, 'outlines')} className="text-indigo-600 text-sm font-medium flex items-center gap-1">
-                  <Plus size={16} /> 新建大纲
-                </button>
-              </div>
-              
-              <div className="space-y-2">
-                {(!activeBook.outlines || activeBook.outlines.length === 0) ? (
-                  <div className="text-center text-gray-400 py-10">暂无大纲，点击右上角新建</div>
-                ) : (
-                  activeBook.outlines.map((outline) => (
-                    <div
-                      key={outline.id}
-                      onClick={() => setActiveOutlineId(outline.id)}
-                      className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-[0.98] transition-transform"
-                    >
-                      <div className="flex-1 truncate pr-4">
-                        <span className="font-medium text-gray-800">{outline.title || '无标题'}</span>
-                        <p className="text-xs text-gray-400 mt-1 truncate">{outline.content || '空'}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <DocItemList 
+              items={activeBook.outlines || []}
+              title="大纲列表"
+              emptyText="暂无大纲，点击右上角新建"
+              onAddGroup={() => createDocItem(activeBook.id, 'outlines', true)}
+              onAddItem={() => createDocItem(activeBook.id, 'outlines')}
+              onSelect={setActiveOutlineId}
+              activeId={activeOutlineId}
+              updateItem={(id, updates) => updateDocItem(activeBook.id, 'outlines', id, updates)}
+              deleteItem={(id) => deleteDocItem(activeBook.id, 'outlines', id)}
+              type="outlines"
+            />
           )}
 
+          {bookTab === 'characters' && (
+            <DocItemList 
+              items={activeBook.characters || []}
+              title="角色列表"
+              emptyText="暂无角色，点击右上角新建"
+              onAddGroup={() => createDocItem(activeBook.id, 'characters', true)}
+              onAddItem={() => createDocItem(activeBook.id, 'characters')}
+              onSelect={setActiveCharacterId}
+              activeId={activeCharacterId}
+              updateItem={(id, updates) => updateDocItem(activeBook.id, 'characters', id, updates)}
+              deleteItem={(id) => deleteDocItem(activeBook.id, 'characters', id)}
+              type="characters"
+            />
+          )}
           {bookTab === 'settings' && (
-            <div className="flex-1 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-gray-700">设定列表</h2>
-                <button onClick={() => createDocItem(activeBook.id, 'settings')} className="text-indigo-600 text-sm font-medium flex items-center gap-1">
-                  <Plus size={16} /> 新建设定
-                </button>
-              </div>
-              
-              <div className="space-y-2">
-                {(!activeBook.settings || activeBook.settings.length === 0) ? (
-                  <div className="text-center text-gray-400 py-10">暂无设定，点击右上角新建</div>
-                ) : (
-                  activeBook.settings.map((setting) => (
-                    <div
-                      key={setting.id}
-                      onClick={() => setActiveSettingId(setting.id)}
-                      className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center cursor-pointer active:scale-[0.98] transition-transform"
-                    >
-                      <div className="flex-1 truncate pr-4">
-                        <span className="font-medium text-gray-800">{setting.title || '无标题'}</span>
-                        <p className="text-xs text-gray-400 mt-1 truncate">{setting.content || '空'}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <DocItemList 
+              items={activeBook.settings || []}
+              title="设定列表"
+              emptyText="暂无设定，点击右上角新建"
+              onAddGroup={() => createDocItem(activeBook.id, 'settings', true)}
+              onAddItem={() => createDocItem(activeBook.id, 'settings')}
+              onSelect={setActiveSettingId}
+              activeId={activeSettingId}
+              updateItem={(id, updates) => updateDocItem(activeBook.id, 'settings', id, updates)}
+              deleteItem={(id) => deleteDocItem(activeBook.id, 'settings', id)}
+              type="settings"
+            />
           )}
           </div>
         </div>

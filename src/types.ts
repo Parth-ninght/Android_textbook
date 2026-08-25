@@ -39,6 +39,7 @@ export interface DocItem {
   title: string;
   content: string;
   updatedAt: number;
+  isVolume?: boolean;
 }
 
 export interface Book {
@@ -51,6 +52,7 @@ export interface Book {
   drafts?: Chapter[];
   outlines?: DocItem[];
   settings?: DocItem[];
+  characters?: DocItem[];
   lastReadChapterId?: string;
   lastReadPage?: number;
   updatedAt: number;
