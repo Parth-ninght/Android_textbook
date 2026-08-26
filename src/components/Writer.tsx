@@ -50,7 +50,7 @@ function BookItem({ book, isSelectMode, isSelected, onLongPress, onClick }: any)
   );
 }
 
-function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete, isDraggable = true, isSelectMode = false, isSelected = false, isCollapsed = false, onToggleCollapse }: { key?: React.Key, chapter: Chapter, index: number, onClick: () => void, onTitleChange?: (val: string) => void, onDelete?: () => void, isDraggable?: boolean, isSelectMode?: boolean, isSelected?: boolean, isCollapsed?: boolean, onToggleCollapse?: () => void }) {
+function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete, isDraggable = true, isSelectMode = false, isSelected = false, isCollapsed = false, onToggleCollapse, itemCount = 0 }: { key?: React.Key, chapter: Chapter, index: number, onClick: () => void, onTitleChange?: (val: string) => void, onDelete?: () => void, isDraggable?: boolean, isSelectMode?: boolean, isSelected?: boolean, isCollapsed?: boolean, onToggleCollapse?: () => void, itemCount?: number }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: chapter.id, disabled: !isDraggable || isSelectMode });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const [isEditingVolume, setIsEditingVolume] = useState(false);
@@ -62,7 +62,7 @@ function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete,
         style={style}
         {...(!isSelectMode && isDraggable ? attributes : {})}
         {...(!isSelectMode && isDraggable ? listeners : {})}
-        className="mt-6 mb-2 flex items-center gap-2 group cursor-pointer relative"
+        className="mt-1 mb-2 flex items-center gap-2 group cursor-pointer relative py-2 border-b border-gray-200 bg-gray-50/50 px-2"
         onClick={(e) => {
           if (isSelectMode) return;
           if (!isEditingVolume) {
@@ -70,7 +70,6 @@ function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete,
           }
         }}
       >
-        <div className="flex-1 h-px bg-gray-200" />
         <button
           onClick={(e) => { e.stopPropagation(); if (onToggleCollapse) onToggleCollapse(); }}
           className="text-gray-400 hover:text-gray-600 px-1"
@@ -93,16 +92,19 @@ function SortableChapterItem({ chapter, index, onClick, onTitleChange, onDelete,
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-32 text-center"
+            className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-48 ml-1"
           />
         ) : (
-          <span className="text-sm font-bold text-gray-500 tracking-wider pr-2">{chapter.title}</span>
+          <div className="flex items-center gap-2 ml-1">
+            <span className="text-sm font-bold text-gray-700 tracking-wider">{chapter.title}</span>
+            <span className="text-xs text-gray-400">({itemCount})</span>
+          </div>
         )}
-        <div className="flex-1 h-px bg-gray-200" />
+        <div className="flex-1" />
         {!isSelectMode && onDelete && (
            <button 
              onClick={(e) => { e.stopPropagation(); onDelete(); }} 
-             className="absolute right-0 p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
+             className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
              title="删除分卷"
            >
              <Trash2 size={14} />
@@ -155,7 +157,7 @@ const highlightText = (text: string, query: string) => {
   );
 };
 
-function DocItemList({ items, title, emptyText, onAddGroup, onAddItem, onSelect, activeId, updateItem, deleteItem, type }: { items: DocItem[], title: string, emptyText: string, onAddGroup: () => void, onAddItem: () => void, onSelect: (id: string) => void, activeId: string | null, updateItem: (id: string, updates: Partial<DocItem>) => void, deleteItem: (id: string) => void, type: string }) {
+function DocItemList({ items, title, emptyText, onAddGroup, onAddItem, onAddItemToVolume, onSelect, activeId, updateItem, deleteItem, type }: { items: DocItem[], title: string, emptyText: string, onAddGroup: () => void, onAddItem: () => void, onAddItemToVolume?: (volumeId: string) => void, onSelect: (id: string) => void, activeId: string | null, updateItem: (id: string, updates: Partial<DocItem>) => void, deleteItem: (id: string) => void, type: string }) {
   const [collapsedVolumes, setCollapsedVolumes] = useState<Set<string>>(new Set());
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
 
@@ -198,15 +200,20 @@ function DocItemList({ items, title, emptyText, onAddGroup, onAddItem, onSelect,
           visibleItems.map((item) => {
             if (item.isVolume) {
               const isCollapsed = collapsedVolumes.has(item.id);
+              const origIndex = items.findIndex(i => i.id === item.id);
+              let itemCount = 0;
+              for (let i = origIndex + 1; i < items.length; i++) {
+                if (items[i].isVolume) break;
+                itemCount++;
+              }
               return (
                 <div
                   key={item.id}
-                  className="mt-6 mb-2 flex items-center gap-2 group cursor-pointer relative"
+                  className="mt-1 mb-2 flex items-center gap-2 group cursor-pointer relative py-2 border-b border-gray-200 bg-gray-50/50 px-2"
                   onClick={() => {
                     if (editingVolumeId !== item.id) setEditingVolumeId(item.id);
                   }}
                 >
-                  <div className="flex-1 h-px bg-gray-200" />
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleVolume(item.id); }}
                     className="text-gray-400 hover:text-gray-600 px-1"
@@ -229,19 +236,33 @@ function DocItemList({ items, title, emptyText, onAddGroup, onAddItem, onSelect,
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-32 text-center"
+                      className="text-sm font-bold text-gray-500 bg-transparent border-b border-gray-400 outline-none w-48 ml-1"
                     />
                   ) : (
-                    <span className="text-sm font-bold text-gray-500 tracking-wider pr-2">{item.title}</span>
+                    <div className="flex items-center gap-2 ml-1">
+                      <span className="text-sm font-bold text-gray-700 tracking-wider">{item.title}</span>
+                      <span className="text-xs text-gray-400">({itemCount})</span>
+                    </div>
                   )}
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} 
-                    className="absolute right-0 p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full transition-opacity opacity-0 group-hover:opacity-100"
-                    title="删除分卷"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-1 transition-opacity opacity-0 group-hover:opacity-100">
+                    {onAddItemToVolume && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onAddItemToVolume(item.id); }} 
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 bg-white shadow-sm border border-gray-100 rounded-full"
+                        title="在此分组下新建"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} 
+                      className="p-1.5 text-gray-400 hover:text-red-500 bg-white shadow-sm border border-gray-100 rounded-full"
+                      title="删除分卷"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               );
             }
@@ -1068,7 +1089,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
     setBookTab('chapters');
   };
 
-  const createDocItem = (bookId: string, type: 'outlines' | 'settings' | 'characters', isVolume: boolean = false) => {
+  const createDocItem = (bookId: string, type: 'outlines' | 'settings' | 'characters', isVolume: boolean = false, targetVolumeId?: string) => {
     const book = books.find(b => b.id === bookId);
     if (!book) return;
 
@@ -1095,7 +1116,20 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
       isVolume: isVolume
     };
     
-    items.push(newItem);
+    if (targetVolumeId && !isVolume) {
+      const volIndex = items.findIndex(i => i.id === targetVolumeId);
+      if (volIndex !== -1) {
+        let insertIndex = volIndex + 1;
+        while (insertIndex < items.length && !items[insertIndex].isVolume) {
+          insertIndex++;
+        }
+        items.splice(insertIndex, 0, newItem);
+      } else {
+        items.push(newItem);
+      }
+    } else {
+      items.push(newItem);
+    }
 
     setBooks(books.map(b => b.id === bookId ? { ...b, [type]: items, updatedAt: Date.now() } : b));
     if (!isVolume) {
@@ -2261,6 +2295,15 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                           {visibleChapters.map((chapter) => {
                             const origIndex = activeBook.chapters.findIndex(c => c.id === chapter.id);
                             const chapterNum = activeBook.chapters.filter((c, i) => i <= origIndex && !c.isVolume).length;
+                            
+                            let itemCount = 0;
+                            if (chapter.isVolume) {
+                              for (let i = origIndex + 1; i < activeBook.chapters.length; i++) {
+                                if (activeBook.chapters[i].isVolume) break;
+                                itemCount++;
+                              }
+                            }
+                            
                             return (
                             <SortableChapterItem
                               key={chapter.id}
@@ -2280,6 +2323,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                               isSelected={selectedChapterIds.includes(chapter.id)}
                               isCollapsed={collapsedVolumes.has(chapter.id)}
                               onToggleCollapse={() => toggleVolume(chapter.id)}
+                              itemCount={itemCount}
                             />
                           )})}
                         </SortableContext>
@@ -2289,6 +2333,15 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                           {displayChapters.map((chapter) => {
                             const origIndex = activeBook.chapters.findIndex(c => c.id === chapter.id);
                             const chapterNum = activeBook.chapters.filter((c, i) => i <= origIndex && !c.isVolume).length;
+
+                            let itemCount = 0;
+                            if (chapter.isVolume) {
+                              for (let i = origIndex + 1; i < activeBook.chapters.length; i++) {
+                                if (activeBook.chapters[i].isVolume) break;
+                                itemCount++;
+                              }
+                            }
+
                             return (
                             <SortableChapterItem
                               key={chapter.id}
@@ -2308,6 +2361,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
                               isSelected={selectedChapterIds.includes(chapter.id)}
                               isCollapsed={collapsedVolumes.has(chapter.id)}
                               onToggleCollapse={() => toggleVolume(chapter.id)}
+                              itemCount={itemCount}
                             />
                           )})}
                       </div>
@@ -2395,6 +2449,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
               emptyText="暂无大纲，点击右上角新建"
               onAddGroup={() => createDocItem(activeBook.id, 'outlines', true)}
               onAddItem={() => createDocItem(activeBook.id, 'outlines')}
+              onAddItemToVolume={(volId) => createDocItem(activeBook.id, 'outlines', false, volId)}
               onSelect={setActiveOutlineId}
               activeId={activeOutlineId}
               updateItem={(id, updates) => updateDocItem(activeBook.id, 'outlines', id, updates)}
@@ -2410,6 +2465,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
               emptyText="暂无角色，点击右上角新建"
               onAddGroup={() => createDocItem(activeBook.id, 'characters', true)}
               onAddItem={() => createDocItem(activeBook.id, 'characters')}
+              onAddItemToVolume={(volId) => createDocItem(activeBook.id, 'characters', false, volId)}
               onSelect={setActiveCharacterId}
               activeId={activeCharacterId}
               updateItem={(id, updates) => updateDocItem(activeBook.id, 'characters', id, updates)}
@@ -2424,6 +2480,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
               emptyText="暂无设定，点击右上角新建"
               onAddGroup={() => createDocItem(activeBook.id, 'settings', true)}
               onAddItem={() => createDocItem(activeBook.id, 'settings')}
+              onAddItemToVolume={(volId) => createDocItem(activeBook.id, 'settings', false, volId)}
               onSelect={setActiveSettingId}
               activeId={activeSettingId}
               updateItem={(id, updates) => updateDocItem(activeBook.id, 'settings', id, updates)}
