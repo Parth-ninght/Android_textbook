@@ -4,7 +4,7 @@ import { useLocalStorage } from '../store';
 import { Book, Chapter, DocItem, AppSettings } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
-import { Plus, ChevronLeft, Trash2, Book as BookIcon, EyeOff, Image as ImageIcon, CheckCircle2, Circle, Download, Upload, X, CheckSquare, BookOpen, Search, Edit3, List, Send, Moon, Sun, Type, Minus, ChevronRight, ArrowDownAZ, ArrowUpZA, FolderPlus, ArrowLeftRight, ArrowUpDown, Undo, Redo, Settings, MoreHorizontal } from 'lucide-react';
+import { Plus, ChevronLeft, Trash2, Book as BookIcon, EyeOff, Image as ImageIcon, CheckCircle2, Circle, Download, Upload, X, CheckSquare, BookOpen, ListTree, Search, Edit3, List, Send, Moon, Sun, Type, Minus, ChevronRight, ArrowDownAZ, ArrowUpZA, FolderPlus, ArrowLeftRight, ArrowUpDown, Undo, Redo, Settings, MoreHorizontal } from 'lucide-react';
 import { useLongPress } from '../hooks/useLongPress';
 import { exportToZip, exportToTxt, exportBookToTxt } from '../lib/export';
 import { DebouncedInput, DebouncedTextarea } from './DebouncedInputs';
@@ -302,6 +302,10 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [isImmersive, setIsImmersive] = useLocalStorage('writer_isImmersive', false);
   const [isOverviewMode, setIsOverviewMode] = useLocalStorage('writer_isOverviewMode', false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [quickViewHeight, setQuickViewHeight] = useState(75);
+  const [quickViewTab, setQuickViewTab] = useState<'outlines' | 'characters' | 'settings'>('outlines');
+  const [quickViewActiveItemId, setQuickViewActiveItemId] = useState<string | null>(null);
   const [editorDrawerTab, setEditorDrawerTab] = useState<'chapters' | 'outlines' | 'characters' | 'settings' | 'drafts' | null>(null);
   const [isSearchMode, setIsSearchMode] = useLocalStorage('writer_isSearchMode', false);
   const [searchQuery, setSearchQuery] = useLocalStorage('writer_searchQuery', '');
@@ -346,6 +350,41 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
       return changed ? newBooks : prev;
     });
   }, [setBooks]);
+
+  const startQuickViewDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const startY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const startHeight = quickViewHeight;
+
+    const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
+      const deltaY = currentY - startY;
+      const deltaVh = (deltaY / window.innerHeight) * 100;
+      let newHeight = startHeight - deltaVh;
+      
+      if (newHeight > 75) newHeight = 75;
+      
+      setQuickViewHeight(newHeight);
+      
+      if (newHeight < 50) {
+        setIsQuickViewOpen(false);
+        setQuickViewHeight(75); // Reset
+        cleanup();
+      }
+    };
+
+    const cleanup = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', cleanup);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', cleanup);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', cleanup);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', cleanup);
+  };
 
   useEffect(() => {
     if (activeBookId && !activeChapterId && bookTab === 'chapters') {
@@ -1215,7 +1254,7 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
 
     return (
       <div 
-        className={`flex flex-col h-full ${!isImmersive ? 'bg-white text-gray-800' : ''}`}
+        className={`flex flex-col h-full relative overflow-hidden ${!isImmersive ? 'bg-white text-gray-800' : ''}`}
         style={immersiveStyle}
       >
         {!isImmersive && (
@@ -1236,8 +1275,11 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
               }} className="p-2 text-gray-600 hover:text-indigo-600" title="直接导出当前单章">
                 <Download size={20} />
               </button>
-              <button onClick={() => setIsImmersive(true)} className="p-2 text-gray-600 hover:text-indigo-600">
+              <button onClick={() => setIsImmersive(true)} className="p-2 text-gray-600 hover:text-indigo-600" title="沉浸模式">
                 <EyeOff size={20} />
+              </button>
+              <button onClick={() => { setIsQuickViewOpen(true); setQuickViewHeight(75); }} className={`p-2 hover:text-indigo-600 ${isQuickViewOpen ? 'text-indigo-600' : 'text-gray-600'}`} title="快捷查看">
+                <ListTree size={20} />
               </button>
               <button onClick={() => setChapterToDelete(activeChapter.id)} className="p-2 -mr-2 text-red-500">
                 <Trash2 size={20} />
@@ -1290,6 +1332,88 @@ export default function WriterTab({ setIsEditing, settings, onOpenSettings, isAc
             className={`flex-1 w-full resize-none border-none outline-none leading-loose text-lg bg-transparent ${!isImmersive ? 'text-gray-700 placeholder-gray-300' : ''}`}
           />
         </div>
+
+        {/* Quick View Drawer */}
+        {isQuickViewOpen && activeBook && (
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-2xl flex flex-col transition-transform z-40"
+            style={{ height: `${quickViewHeight}vh` }}
+          >
+            <div className="flex flex-col border-b border-gray-100 bg-gray-50/50 rounded-t-2xl relative pt-2 px-4">
+              <div 
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-8 cursor-ns-resize flex items-center justify-center z-50" 
+                onMouseDown={startQuickViewDrag} 
+                onTouchStart={startQuickViewDrag}
+              >
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+              </div>
+              
+              <div className="flex gap-6 mt-4 relative z-10 w-full items-center">
+                <button onClick={() => {setQuickViewTab('outlines'); setQuickViewActiveItemId(null);}} className={`pb-2 px-2 text-sm font-bold ${quickViewTab === 'outlines' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'}`}>大纲</button>
+                <button onClick={() => {setQuickViewTab('characters'); setQuickViewActiveItemId(null);}} className={`pb-2 px-2 text-sm font-bold ${quickViewTab === 'characters' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'}`}>角色</button>
+                <button onClick={() => {setQuickViewTab('settings'); setQuickViewActiveItemId(null);}} className={`pb-2 px-2 text-sm font-bold ${quickViewTab === 'settings' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'}`}>设定</button>
+                <div className="flex-1" />
+                <button onClick={() => setIsQuickViewOpen(false)} className="pb-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-hidden flex bg-white">
+              {!quickViewActiveItemId ? (
+                <div className="w-full h-full overflow-y-auto p-4 max-w-3xl mx-auto">
+                  <DocItemList 
+                    items={activeBook[quickViewTab] || []}
+                    title={quickViewTab === 'outlines' ? '大纲' : quickViewTab === 'characters' ? '角色' : '设定'}
+                    emptyText="暂无内容"
+                    onAddGroup={() => createDocItem(activeBook.id, quickViewTab, true)}
+                    onAddItem={() => createDocItem(activeBook.id, quickViewTab)}
+                    onAddItemToVolume={(volId) => createDocItem(activeBook.id, quickViewTab, false, volId)}
+                    onSelect={setQuickViewActiveItemId}
+                    activeId={quickViewActiveItemId}
+                    updateItem={(id, updates) => updateDocItem(activeBook.id, quickViewTab, id, updates)}
+                    deleteItem={(id) => deleteDocItem(activeBook.id, quickViewTab, id)}
+                    type={quickViewTab}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full overflow-y-auto p-6 flex flex-col max-w-3xl mx-auto">
+                  <button onClick={() => setQuickViewActiveItemId(null)} className="text-gray-500 flex items-center mb-6 hover:text-indigo-600 transition-colors w-fit font-medium text-sm">
+                    <ChevronLeft size={18} className="mr-1" /> 返回列表
+                  </button>
+                  {(() => {
+                    const item = activeBook[quickViewTab]?.find(i => i.id === quickViewActiveItemId);
+                    if (!item) { 
+                      setTimeout(() => setQuickViewActiveItemId(null), 0);
+                      return null; 
+                    }
+                    return (
+                      <div className="flex-1 flex flex-col w-full">
+                        <DebouncedInput
+                          key={`qv-title-${item.id}`}
+                          type="text"
+                          placeholder={item.isVolume ? "分组名称" : "标题"}
+                          defaultValue={item.title}
+                          onChange={value => updateDocItem(activeBook.id, quickViewTab, item.id, { title: value })}
+                          className="text-2xl font-bold w-full outline-none mb-6 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-indigo-300 pb-2 transition-colors text-gray-800"
+                        />
+                        {!item.isVolume && (
+                          <DebouncedTextarea
+                            key={`qv-content-${item.id}`}
+                            defaultValue={item.content}
+                            onChange={value => updateDocItem(activeBook.id, quickViewTab, item.id, { content: value })}
+                            placeholder="开始记录内容..."
+                            className="w-full flex-1 resize-none outline-none text-gray-700 leading-relaxed bg-transparent hover:bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all rounded-lg p-2"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
