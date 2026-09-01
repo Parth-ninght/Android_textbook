@@ -7,6 +7,7 @@ import { useState } from 'react';
 import NotesTab from './components/Notes';
 import DiaryTab from './components/Diary';
 import WriterTab from './components/Writer';
+import CloudSync from './components/CloudSync';
 import { Edit3, Calendar, BookOpen, Settings as SettingsIcon, X, LogOut } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useLocalStorage } from './store';
@@ -98,14 +99,16 @@ export default function App() {
         {/* Settings Modal */}
         {showSettings && (
           <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
-              <div className="flex justify-between items-center p-4 border-b">
+            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
                 <h2 className="text-lg font-bold text-gray-800">设置</h2>
                 <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-gray-800">
                   <X size={24} />
                 </button>
               </div>
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                <CloudSync settings={settings} updateSettings={updateSettings} />
+                
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-800">修改后置顶</h3>

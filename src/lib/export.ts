@@ -202,10 +202,29 @@ export const exportToZip = async (data: {
 
           // Otherwise, proceed to generate the ZIP for standalone/WebView mode
           const zip = new JSZip();
-          const rootName = data.books && data.books.length === 1 && !data.notes && !data.diaries && !data.noteFolders && !data.diaryFolders 
-              ? (data.books[0].title || '未命名作品')
-              : `Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
+
+          let rootName = `Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
           
+          const isOnlyBooks = data.books && data.books.length > 0 && !data.notes && !data.diaries;
+          const isOnlyNotes = data.notes && data.notes.length > 0 && !data.books && !data.diaries;
+          const isOnlyDiaries = data.diaries && data.diaries.length > 0 && !data.books && !data.notes;
+
+          if (isOnlyBooks && data.books!.length === 1) {
+              rootName = data.books![0].title || '未命名作品';
+          } else if (isOnlyNotes) {
+              const uniqueFolderIds = Array.from(new Set(data.notes!.map(n => n.folderId).filter(Boolean)));
+              if (uniqueFolderIds.length === 1 && (!data.notes!.some(n => !n.folderId))) {
+                  const f = data.noteFolders?.find(f => f.id === uniqueFolderIds[0]);
+                  if (f) rootName = f.name || '未命名分组';
+              }
+          } else if (isOnlyDiaries) {
+              const uniqueFolderIds = Array.from(new Set(data.diaries!.map(d => d.folderId).filter(Boolean)));
+              if (uniqueFolderIds.length === 1 && (!data.diaries!.some(d => !d.folderId))) {
+                  const f = data.diaryFolders?.find(f => f.id === uniqueFolderIds[0]);
+                  if (f) rootName = f.name || '未命名分组';
+              }
+          }
+
           const root = zip; // Put everything at root of ZIP to prevent deep nesting and fix backup.json path
 
           // Add raw JSON backup for easy importing to another device
@@ -216,26 +235,32 @@ export const exportToZip = async (data: {
           }, null, 2));
 
           if (data.notes && data.notes.length > 0) {
-              const notesFolder = root.folder('记事');
+              const uniqueFolderIds = Array.from(new Set(data.notes.map(n => n.folderId).filter(Boolean)));
+              const hasMultipleGroups = uniqueFolderIds.length > 1 || (uniqueFolderIds.length > 0 && data.notes.some(n => !n.folderId)) || !isOnlyNotes;
+              const notesFolder = hasMultipleGroups ? root.folder('记事') : root;
+
               data.notes.forEach(note => {
                 if (!note.content || note.content.trim().length === 0) return;
                 let targetFolder = notesFolder;
                 if (note.folderId && data.noteFolders) {
                   const f = data.noteFolders.find(f => f.id === note.folderId);
-                  if (f) targetFolder = notesFolder?.folder(f.name) || notesFolder;
+                  if (f) targetFolder = hasMultipleGroups ? notesFolder?.folder(f.name) || notesFolder : notesFolder;
                 }
                 targetFolder?.file(`${note.title || '无标题'}.txt`, note.content || '');
               });
           }
 
           if (data.diaries && data.diaries.length > 0) {
-              const diariesFolder = root.folder('日记');
+              const uniqueFolderIds = Array.from(new Set(data.diaries.map(d => d.folderId).filter(Boolean)));
+              const hasMultipleGroups = uniqueFolderIds.length > 1 || (uniqueFolderIds.length > 0 && data.diaries.some(d => !d.folderId)) || !isOnlyDiaries;
+              const diariesFolder = hasMultipleGroups ? root.folder('日记') : root;
+
               data.diaries.forEach(diary => {
                 if (!diary.content || diary.content.trim().length === 0) return;
                 let targetFolder = diariesFolder;
                 if (diary.folderId && data.diaryFolders) {
                   const f = data.diaryFolders.find(f => f.id === diary.folderId);
-                  if (f) targetFolder = diariesFolder?.folder(f.name) || diariesFolder;
+                  if (f) targetFolder = hasMultipleGroups ? diariesFolder?.folder(f.name) || diariesFolder : diariesFolder;
                 }
                 const dateStr = format(new Date(diary.date), 'yyyy-MM-dd');
                 targetFolder?.file(`${dateStr}.txt`, diary.content || '');

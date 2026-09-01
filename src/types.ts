@@ -65,5 +65,8 @@ export interface AppSettings {
   showWritingStats?: boolean;
   theme?: 'light' | 'dark';
   readerFontSize?: number;
+  webdavUrl?: string;
+  webdavUser?: string;
+  webdavPassword?: string;
 }
 
