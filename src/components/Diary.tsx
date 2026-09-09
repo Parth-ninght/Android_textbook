@@ -170,13 +170,20 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
 
   useEffect(() => {
     if (!activeDiaryId) {
-      setDiaries(prev => prev.filter(d => d.content.trim() || d.weather?.trim() || d.mood?.trim()));
+      setDiaries(prev => {
+        const filtered = prev.filter(d => d.content.trim() || d.weather?.trim() || d.mood?.trim());
+        return filtered.length === prev.length ? prev : filtered;
+      });
     }
   }, [activeDiaryId]);
 
   const displayedDiaries = diaries
     .filter(d => activeFolderId === null || d.folderId === activeFolderId)
-    .sort((a, b) => (b.order || 0) - (a.order || 0));
+    .sort((a, b) => {
+      const orderA = a.order ?? a.updatedAt ?? 0;
+      const orderB = b.order ?? b.updatedAt ?? 0;
+      return orderB - orderA;
+    });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -190,16 +197,18 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
       const newIndex = displayedDiaries.findIndex(d => d.id === over.id);
       
       const reordered = arrayMove(displayedDiaries, oldIndex, newIndex);
-      const maxOrder = Math.max(...displayedDiaries.map(d => d.order), displayedDiaries.length * 10);
+      const baseOrder = Date.now();
       
-      const updatedDiaries = [...diaries];
-      reordered.forEach((diary: any, index) => {
-        const diaryIndex = updatedDiaries.findIndex(d => d.id === diary.id);
-        if (diaryIndex > -1) {
-          updatedDiaries[diaryIndex] = { ...updatedDiaries[diaryIndex], order: maxOrder - index };
-        }
+      setDiaries(prev => {
+        const updatedDiaries = [...prev];
+        reordered.forEach((diary: any, index) => {
+          const diaryIndex = updatedDiaries.findIndex(d => d.id === diary.id);
+          if (diaryIndex > -1) {
+            updatedDiaries[diaryIndex] = { ...updatedDiaries[diaryIndex], order: baseOrder - index * 1000 };
+          }
+        });
+        return updatedDiaries;
       });
-      setDiaries(updatedDiaries);
     }
   };
 
@@ -212,6 +221,7 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
   };
 
   const createDiary = () => {
+    const now = Date.now();
     const newDiary: Diary = {
       id: uuidv4(),
       folderId: activeFolderId,
@@ -219,21 +229,23 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
       content: '',
       mood: 'smile',
       weather: 'sun',
-      updatedAt: Date.now(),
-      order: Date.now(),
+      updatedAt: now,
+      order: now,
     };
     setDiaries([...diaries, newDiary]);
     setActiveDiaryId(newDiary.id);
   };
 
   const updateDiary = (id: string, updates: Partial<Diary>) => {
-    setDiaries(diaries.map(d => {
+    const shouldBringToFront = settings.bringToFrontOnEdit !== false;
+    const now = Date.now();
+    setDiaries(prev => prev.map(d => {
       if (d.id === id) {
         return {
           ...d,
           ...updates,
-          updatedAt: Date.now(),
-          order: settings.bringToFrontOnEdit ? Date.now() : d.order
+          updatedAt: now,
+          order: shouldBringToFront ? now : (d.order ?? d.updatedAt ?? now)
         };
       }
       return d;
@@ -472,7 +484,13 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
                           onLongPress={() => handleDiaryLongPress(diary.id)}
                           onClick={() => {
                             if (isSelectMode) toggleDiarySelection(diary.id);
-                            else setActiveDiaryId(diary.id);
+                            else {
+                              setActiveDiaryId(diary.id);
+                              if (settings.bringToFrontOnRead !== false) {
+                                const now = Date.now();
+                                setDiaries(prev => prev.map(d => d.id === diary.id ? { ...d, order: now } : d));
+                              }
+                            }
                           }} 
                         />
                       </div>

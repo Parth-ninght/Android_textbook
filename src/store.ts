@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
@@ -23,21 +23,30 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   });
 
-  const setValue = (value: T | ((val: T) => T)) => {
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      const stringValue = JSON.stringify(valueToStore);
-      
-      if (typeof window !== 'undefined' && (window as any).plus && (window as any).plus.storage) {
-        (window as any).plus.storage.setItem(key, stringValue);
-      }
-      // Always write to localStorage as a fallback
-      window.localStorage.setItem(key, stringValue);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      setStoredValue(prev => {
+        try {
+          const valueToStore = value instanceof Function ? value(prev) : value;
+          if (Object.is(valueToStore, prev)) {
+            return prev;
+          }
+          const stringValue = JSON.stringify(valueToStore);
+
+          if (typeof window !== 'undefined' && (window as any).plus && (window as any).plus.storage) {
+            (window as any).plus.storage.setItem(key, stringValue);
+          }
+          // Always write to localStorage as a fallback
+          window.localStorage.setItem(key, stringValue);
+          return valueToStore;
+        } catch (error) {
+          console.error(error);
+          return prev;
+        }
+      });
+    },
+    [key]
+  );
 
   return [storedValue, setValue] as const;
 }

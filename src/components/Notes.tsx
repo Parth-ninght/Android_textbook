@@ -139,7 +139,10 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
 
   useEffect(() => {
     if (!activeNoteId) {
-      setNotes(prev => prev.filter(n => n.title.trim() || n.content.trim()));
+      setNotes(prev => {
+        const filtered = prev.filter(n => n.title.trim() || n.content.trim());
+        return filtered.length === prev.length ? prev : filtered;
+      });
     }
   }, [activeNoteId]);
 
@@ -148,7 +151,9 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
     .sort((a, b) => {
       if (sortMode === 'newest') return b.updatedAt - a.updatedAt;
       if (sortMode === 'oldest') return a.updatedAt - b.updatedAt;
-      return b.order - a.order;
+      const orderA = a.order ?? a.updatedAt ?? 0;
+      const orderB = b.order ?? b.updatedAt ?? 0;
+      return orderB - orderA;
     });
 
   const sensors = useSensors(
@@ -163,16 +168,18 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
       const newIndex = displayedNotes.findIndex(n => n.id === over.id);
       
       const reordered = arrayMove(displayedNotes, oldIndex, newIndex);
-      const maxOrder = Math.max(...displayedNotes.map(n => n.order), displayedNotes.length * 10);
+      const baseOrder = Date.now();
       
-      const updatedNotes = [...notes];
-      reordered.forEach((note: any, index) => {
-        const noteIndex = updatedNotes.findIndex(n => n.id === note.id);
-        if (noteIndex > -1) {
-          updatedNotes[noteIndex] = { ...updatedNotes[noteIndex], order: maxOrder - index };
-        }
+      setNotes(prev => {
+        const updatedNotes = [...prev];
+        reordered.forEach((note: any, index) => {
+          const noteIndex = updatedNotes.findIndex(n => n.id === note.id);
+          if (noteIndex > -1) {
+            updatedNotes[noteIndex] = { ...updatedNotes[noteIndex], order: baseOrder - index * 1000 };
+          }
+        });
+        return updatedNotes;
       });
-      setNotes(updatedNotes);
     }
   };
 
@@ -185,26 +192,29 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
   };
 
   const createNote = () => {
+    const now = Date.now();
     const newNote: Note = {
       id: uuidv4(),
       folderId: activeFolderId,
       title: '',
       content: '',
-      updatedAt: Date.now(),
-      order: Date.now(),
+      updatedAt: now,
+      order: now,
     };
     setNotes([...notes, newNote]);
     setActiveNoteId(newNote.id);
   };
 
   const updateNote = (id: string, updates: Partial<Note>) => {
-    setNotes(notes.map(n => {
+    const shouldBringToFront = settings.bringToFrontOnEdit !== false;
+    const now = Date.now();
+    setNotes(prev => prev.map(n => {
       if (n.id === id) {
         return {
           ...n,
           ...updates,
-          updatedAt: Date.now(),
-          order: settings.bringToFrontOnEdit ? Date.now() : n.order
+          updatedAt: now,
+          order: shouldBringToFront ? now : (n.order ?? n.updatedAt ?? now)
         };
       }
       return n;
@@ -444,7 +454,13 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
                     onLongPress={() => handleNoteLongPress(note.id)}
                     onClick={() => {
                       if (isSelectMode) toggleNoteSelection(note.id);
-                      else setActiveNoteId(note.id);
+                      else {
+                        setActiveNoteId(note.id);
+                        if (settings.bringToFrontOnRead !== false) {
+                          const now = Date.now();
+                          setNotes(prev => prev.map(n => n.id === note.id ? { ...n, order: now } : n));
+                        }
+                      }
                     }} 
                     sortMode={sortMode}
                   />

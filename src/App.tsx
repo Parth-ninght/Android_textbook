@@ -19,6 +19,7 @@ type Tab = 'notes' | 'diary' | 'writer';
 
 const defaultSettings: AppSettings = {
   bringToFrontOnEdit: true,
+  bringToFrontOnRead: true,
   immersiveBgColor: '#1a1a1a',
   immersiveTextColor: '#e5e7eb',
   showWritingStats: true
@@ -112,7 +113,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-800">修改后置顶</h3>
-                    <p className="text-xs text-gray-500 mt-1">编辑记事或日记后，自动将其移动到列表最上方。</p>
+                    <p className="text-xs text-gray-500 mt-1">编辑作品、章节、记事或日记后，自动将其移动到列表最上方。</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -120,6 +121,22 @@ export default function App() {
                       className="sr-only peer"
                       checked={settings.bringToFrontOnEdit}
                       onChange={(e) => updateSettings({ bringToFrontOnEdit: e.target.checked })}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-800">阅读后置顶</h3>
+                    <p className="text-xs text-gray-500 mt-1">阅读作品或查看记事、日记后，自动将其移动到列表最上方。</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={settings.bringToFrontOnRead !== false}
+                      onChange={(e) => updateSettings({ bringToFrontOnRead: e.target.checked })}
                     />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                   </label>

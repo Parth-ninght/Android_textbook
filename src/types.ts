@@ -56,10 +56,12 @@ export interface Book {
   lastReadChapterId?: string;
   lastReadPage?: number;
   updatedAt: number;
+  order?: number;
 }
 
 export interface AppSettings {
   bringToFrontOnEdit: boolean;
+  bringToFrontOnRead?: boolean;
   immersiveBgColor?: string;
   immersiveTextColor?: string;
   showWritingStats?: boolean;
