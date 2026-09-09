@@ -155,11 +155,14 @@ export function useBookManager(settings: AppSettings) {
     const shouldBring = isRead
       ? settings.bringToFrontOnRead !== false
       : settings.bringToFrontOnEdit !== false;
-    return shouldBring ? Date.now() : (currentOrder || Date.now());
+    if (!shouldBring) return currentOrder ?? 0;
+    const maxOrder = books.reduce((max, b) => Math.max(max, b.order ?? 0, b.updatedAt ?? 0), 0);
+    return Math.max(Date.now(), maxOrder + 1);
   };
 
   const createBook = () => {
     const now = Date.now();
+    const maxOrder = books.reduce((max, b) => Math.max(max, b.order ?? 0, b.updatedAt ?? 0), 0);
     const newBook: Book = {
       id: uuidv4(),
       title: '未命名作品',
@@ -169,7 +172,7 @@ export function useBookManager(settings: AppSettings) {
       settings: [],
       characters: [],
       updatedAt: now,
-      order: now
+      order: Math.max(now, maxOrder + 1)
     };
     setBooks([newBook, ...books]);
     setActiveBookId(newBook.id);
@@ -562,6 +565,50 @@ export function useBookManager(settings: AppSettings) {
     else setActiveCharacterId(null);
   };
 
+  const deleteSelectedDocItems = (bookId: string, type: DocItemType, itemIds: string[]) => {
+    const now = Date.now();
+    setBooks(prev =>
+      prev.map(b =>
+        b.id === bookId
+          ? {
+              ...b,
+              [type]: (b[type] || []).filter(item => !itemIds.includes(item.id)),
+              updatedAt: now,
+              order: getNextOrder(b.order, false)
+            }
+          : b
+      )
+    );
+  };
+
+  const moveDocItemsToVolume = (
+    bookId: string,
+    type: DocItemType,
+    itemIds: string[],
+    targetVolumeId: string
+  ) => {
+    const now = Date.now();
+    setBooks(prev =>
+      prev.map(b => {
+        if (b.id !== bookId) return b;
+        const currentItems = b[type] || [];
+        const itemsToMove = currentItems.filter(i => itemIds.includes(i.id) && !i.isVolume);
+        const remainingItems = currentItems.filter(i => !itemIds.includes(i.id) || i.isVolume);
+        const targetVolIndex = remainingItems.findIndex(i => i.id === targetVolumeId && i.isVolume);
+        if (targetVolIndex === -1) return b;
+
+        const newItems = [...remainingItems];
+        newItems.splice(targetVolIndex + 1, 0, ...itemsToMove);
+        return {
+          ...b,
+          [type]: newItems,
+          updatedAt: now,
+          order: getNextOrder(b.order, false)
+        };
+      })
+    );
+  };
+
   const handleExitChapter = () => {
     if (
       activeChapter &&
@@ -710,6 +757,8 @@ export function useBookManager(settings: AppSettings) {
     createDocItem,
     updateDocItem,
     deleteDocItem,
+    deleteSelectedDocItems,
+    moveDocItemsToVolume,
     handleExitChapter,
     handleExitDraft,
     handleExitOutline,

@@ -40,6 +40,8 @@ interface BookDetailChaptersTabProps {
   handleImportFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleImportSingleChapter: (e: React.ChangeEvent<HTMLInputElement>) => void;
   setBooks: React.Dispatch<React.SetStateAction<Book[]>>;
+  chapterListScrollRef?: React.RefObject<HTMLDivElement>;
+  scrollPosRef?: React.MutableRefObject<Record<string, number>>;
 }
 
 export function BookDetailChaptersTab({
@@ -53,7 +55,9 @@ export function BookDetailChaptersTab({
   onUpdateBook,
   handleImportFile,
   handleImportSingleChapter,
-  setBooks
+  setBooks,
+  chapterListScrollRef,
+  scrollPosRef
 }: BookDetailChaptersTabProps) {
   const [chapterToDelete, setChapterToDelete] = useState<string | null>(null);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
@@ -138,8 +142,8 @@ export function BookDetailChaptersTab({
   const volumes = activeBook.chapters.filter(c => c.isVolume);
 
   return (
-    <div className="flex-1 flex flex-col relative pb-16">
-      <div className="flex justify-between items-center mb-4">
+    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+      <div className="flex justify-between items-center mb-3 shrink-0">
         <h2 className="font-bold text-gray-700">章节列表</h2>
         <div className="flex items-center gap-2 relative">
           {isChapterSelectMode ? (
@@ -222,7 +226,7 @@ export function BookDetailChaptersTab({
       </div>
 
       {/* Chapter Search & Sort Bar */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3 shrink-0">
         <div className="flex-1 relative bg-white border border-gray-200 rounded-lg flex items-center px-3 py-2 shadow-sm">
           <Search size={16} className="text-gray-400" />
           <input
@@ -252,7 +256,16 @@ export function BookDetailChaptersTab({
         )}
       </div>
 
-      <div className="space-y-2">
+      {/* Scrollable Chapter List */}
+      <div
+        ref={chapterListScrollRef}
+        onScroll={e => {
+          if (scrollPosRef) {
+            scrollPosRef.current[activeBook.id] = (e.target as HTMLDivElement).scrollTop;
+          }
+        }}
+        className="flex-1 overflow-y-auto min-h-0 space-y-2 pb-24"
+      >
         {displayChapters.length === 0 ? (
           <div className="text-center text-gray-400 py-10">未找到章节</div>
         ) : isDndEnabled ? (
@@ -395,7 +408,7 @@ export function BookDetailChaptersTab({
 
       {/* Volume Selection Modal */}
       {showVolumeSelectModal && (
-        <div className="absolute inset-0 bg-black/50 z-[100] flex justify-center items-end sm:items-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex justify-center items-end sm:items-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative">
             <button
               onClick={() => setShowVolumeSelectModal(false)}
@@ -430,8 +443,8 @@ export function BookDetailChaptersTab({
 
       {/* Delete Single Chapter Modal */}
       {chapterToDelete && (
-        <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <h2 className="text-lg font-bold text-gray-800 mb-2">删除章节</h2>
             <p className="text-gray-500 mb-6">确定要删除该章节吗？此操作不可恢复。</p>
             <div className="flex justify-end gap-2">
@@ -457,8 +470,8 @@ export function BookDetailChaptersTab({
 
       {/* Batch Delete Chapters Modal */}
       {showBatchDeleteConfirm && (
-        <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <h2 className="text-lg font-bold text-gray-800 mb-2">批量删除</h2>
             <p className="text-gray-500 mb-6">
               确定要删除选中的 {selectedChapterIds.length} 个章节吗？此操作不可恢复。

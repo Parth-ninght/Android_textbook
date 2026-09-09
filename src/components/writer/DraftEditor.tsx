@@ -33,6 +33,7 @@ export function DraftEditor({
   editorTextareaRef
 }: DraftEditorProps) {
   const [showInsertModal, setShowInsertModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [insertPosition, setInsertPosition] = useState<number>(1);
 
   const textChapterCount = activeBook?.chapters.filter(c => !c.isVolume).length || 0;
@@ -92,8 +93,8 @@ export function DraftEditor({
               <EyeOff size={20} />
             </button>
             <button
-              onClick={() => onDeleteDraft(activeDraft.id)}
-              className="p-2 -mr-2 text-red-500"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-2 -mr-2 text-red-500 hover:bg-red-50 rounded transition-colors"
               title="删除草稿"
             >
               <Trash2 size={20} />
@@ -137,10 +138,39 @@ export function DraftEditor({
         />
       </div>
 
+      {/* Delete Draft Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">删除草稿</h2>
+            <p className="text-gray-500 mb-6">
+              确定要删除草稿“{activeDraft.title || '无标题草稿'}”吗？此操作不可恢复。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  onDeleteDraft(activeDraft.id);
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Insert Draft Modal */}
       {showInsertModal && (
-        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6">
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <h2 className="text-xl font-bold text-gray-800 mb-4">插入章节</h2>
             <p className="text-sm text-gray-500 mb-4">
               选择要插入的位置，草稿将作为新章节插入到该位置。

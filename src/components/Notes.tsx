@@ -208,13 +208,15 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
   const updateNote = (id: string, updates: Partial<Note>) => {
     const shouldBringToFront = settings.bringToFrontOnEdit !== false;
     const now = Date.now();
+    const maxOrder = notes.reduce((max, n) => Math.max(max, n.order ?? 0, n.updatedAt ?? 0), 0);
+    const nextOrder = shouldBringToFront ? Math.max(now, maxOrder + 1) : undefined;
     setNotes(prev => prev.map(n => {
       if (n.id === id) {
         return {
           ...n,
           ...updates,
           updatedAt: now,
-          order: shouldBringToFront ? now : (n.order ?? n.updatedAt ?? now)
+          order: nextOrder ?? (n.order ?? n.updatedAt ?? now)
         };
       }
       return n;
@@ -458,7 +460,9 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
                         setActiveNoteId(note.id);
                         if (settings.bringToFrontOnRead !== false) {
                           const now = Date.now();
-                          setNotes(prev => prev.map(n => n.id === note.id ? { ...n, order: now } : n));
+                          const maxOrder = notes.reduce((max, n) => Math.max(max, n.order ?? 0, n.updatedAt ?? 0), 0);
+                          const nextOrder = Math.max(now, maxOrder + 1);
+                          setNotes(prev => prev.map(n => n.id === note.id ? { ...n, order: nextOrder, updatedAt: sortMode === 'newest' ? nextOrder : n.updatedAt } : n));
                         }
                       }
                     }} 

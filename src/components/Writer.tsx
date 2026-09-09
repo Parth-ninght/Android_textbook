@@ -69,6 +69,8 @@ export default function WriterTab({
     createDocItem,
     updateDocItem,
     deleteDocItem,
+    deleteSelectedDocItems,
+    moveDocItemsToVolume,
     handleExitChapter,
     handleExitDraft,
     handleExitOutline,
@@ -246,6 +248,12 @@ export default function WriterTab({
         }
         onUpdateDocItem={(type, id, updates) => updateDocItem(activeBook.id, type, id, updates)}
         onDeleteDocItem={(type, id) => deleteDocItem(activeBook.id, type, id)}
+        onDeleteSelectedDocItems={(type, selectedIds) =>
+          deleteSelectedDocItems(activeBook.id, type, selectedIds)
+        }
+        onMoveDocItemsToVolume={(type, selectedIds, targetVolId) =>
+          moveDocItemsToVolume(activeBook.id, type, selectedIds, targetVolId)
+        }
         editorTextareaRef={editorTextareaRef}
       />
     );
@@ -345,15 +353,25 @@ export default function WriterTab({
         onUpdateChapter={updateChapter}
         onDeleteChapter={deleteChapter}
         onDeleteSelectedChapters={deleteSelectedChapters}
-        onSelectChapter={setActiveChapterId}
-        onSelectDraft={setActiveDraftId}
+        onSelectChapter={id => {
+          setActiveChapterId(id);
+          updateBook(activeBook.id, { lastOpenedAt: Date.now() }, true);
+        }}
+        onSelectDraft={id => {
+          setActiveDraftId(id);
+          updateBook(activeBook.id, { lastOpenedAt: Date.now() }, true);
+        }}
+        onDeleteDraft={draftId => deleteDraft(activeBook.id, draftId)}
         onSelectDocItem={(type, id) => {
           if (type === 'outlines') setActiveOutlineId(id);
           else if (type === 'settings') setActiveSettingId(id);
           else setActiveCharacterId(id);
+          updateBook(activeBook.id, { lastOpenedAt: Date.now() }, true);
         }}
         onUpdateDocItem={updateDocItem}
         onDeleteDocItem={deleteDocItem}
+        onDeleteSelectedDocItems={deleteSelectedDocItems}
+        onMoveDocItemsToVolume={moveDocItemsToVolume}
         handleImportFile={handleImportFile}
         handleImportSingleChapter={handleImportSingleChapter}
         chapterListScrollRef={chapterListScrollRef}

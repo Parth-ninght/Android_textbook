@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DocItem } from '../../types';
 import { ChevronLeft, Redo, Trash2, Undo } from 'lucide-react';
 import { DebouncedInput, DebouncedTextarea } from '../DebouncedInputs';
@@ -25,6 +25,8 @@ export function DocItemEditor({
   onDelete,
   editorTextareaRef
 }: DocItemEditorProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const getTitlePlaceholder = () => {
     if (type === 'outlines') {
       return item.isVolume ? '大纲分组名称' : '大纲标题';
@@ -43,6 +45,15 @@ export function DocItemEditor({
       return '记录设定内容...';
     }
     return '记录角色档案、性格、背景等...';
+  };
+
+  const handleDeleteClick = () => {
+    // Except for groups, other things prompt before deleting
+    if (item.isVolume) {
+      onDelete();
+    } else {
+      setShowDeleteConfirm(true);
+    }
   };
 
   return (
@@ -67,8 +78,8 @@ export function DocItemEditor({
             <Redo size={20} />
           </button>
           <button
-            onClick={onDelete}
-            className="p-2 -mr-2 text-red-500"
+            onClick={handleDeleteClick}
+            className="p-2 -mr-2 text-red-500 hover:bg-red-50 rounded transition-colors"
             title="删除"
           >
             <Trash2 size={20} />
@@ -96,6 +107,37 @@ export function DocItemEditor({
           />
         )}
       </div>
+
+      {/* Delete Item Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">
+              删除{type === 'outlines' ? '大纲' : type === 'settings' ? '设定' : '角色'}
+            </h2>
+            <p className="text-gray-500 mb-6">
+              确定要删除“{item.title || '无标题'}”吗？此操作不可恢复。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  onDelete();
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

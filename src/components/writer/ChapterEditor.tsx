@@ -20,6 +20,8 @@ interface ChapterEditorProps {
   onCreateDocItem: (type: DocItemType, isVolume?: boolean, targetVolumeId?: string) => void;
   onUpdateDocItem: (type: DocItemType, id: string, updates: Partial<DocItem>) => void;
   onDeleteDocItem: (type: DocItemType, id: string) => void;
+  onDeleteSelectedDocItems?: (type: DocItemType, selectedIds: string[]) => void;
+  onMoveDocItemsToVolume?: (type: DocItemType, selectedIds: string[], targetVolumeId: string) => void;
   editorTextareaRef: React.RefObject<HTMLTextAreaElement>;
 }
 
@@ -37,6 +39,8 @@ export function ChapterEditor({
   onCreateDocItem,
   onUpdateDocItem,
   onDeleteDocItem,
+  onDeleteSelectedDocItems,
+  onMoveDocItemsToVolume,
   editorTextareaRef
 }: ChapterEditorProps) {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -163,8 +167,8 @@ export function ChapterEditor({
       )}
 
       {isDeleting && (
-        <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6">
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
             <h2 className="text-lg font-bold text-gray-800 mb-2">删除章节</h2>
             <p className="text-gray-500 mb-6">确定要删除该章节吗？此操作不可恢复。</p>
             <div className="flex justify-end gap-2">
@@ -298,6 +302,16 @@ export function ChapterEditor({
                   updateItem={(id, updates) => onUpdateDocItem(quickViewTab, id, updates)}
                   deleteItem={id => onDeleteDocItem(quickViewTab, id)}
                   type={quickViewTab}
+                  onDeleteSelectedItems={selectedIds => {
+                    if (onDeleteSelectedDocItems) {
+                      onDeleteSelectedDocItems(quickViewTab, selectedIds);
+                    }
+                  }}
+                  onMoveSelectedToVolume={(selectedIds, targetVolId) => {
+                    if (onMoveDocItemsToVolume) {
+                      onMoveDocItemsToVolume(quickViewTab, selectedIds, targetVolId);
+                    }
+                  }}
                 />
               </div>
             ) : (
