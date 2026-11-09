@@ -279,6 +279,28 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
     setSelectedFolderIds([]);
   };
 
+  const handleBatchDelete = () => {
+    const totalSelected = selectedDiaryIds.length + selectedFolderIds.length;
+    if (totalSelected === 0) return;
+    if (window.confirm(`确定要删除选中的 ${totalSelected} 个项目吗？此操作无法撤销。`)) {
+      if (selectedDiaryIds.length > 0) {
+        setDiaries(prev => prev.filter(d => !selectedDiaryIds.includes(d.id)));
+      }
+      if (selectedFolderIds.length > 0) {
+        setFolders(prev => prev.filter(f => !selectedFolderIds.includes(f.id)));
+        setDiaries(prev =>
+          prev.map(d => (selectedFolderIds.includes(d.folderId || '') ? { ...d, folderId: undefined } : d))
+        );
+        if (selectedFolderIds.includes(activeFolderId || '')) {
+          setActiveFolderId(null);
+        }
+      }
+      setSelectedDiaryIds([]);
+      setSelectedFolderIds([]);
+      setIsSelectMode(false);
+    }
+  };
+
   const toggleDiarySelection = (id: string) => {
     setSelectedDiaryIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
@@ -419,6 +441,15 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
         <div className="flex gap-2">
           {isSelectMode ? (
             <>
+              <button
+                onClick={handleBatchDelete}
+                disabled={selectedDiaryIds.length + selectedFolderIds.length === 0}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-full flex items-center gap-1 text-sm font-medium disabled:opacity-40"
+                title="批量删除"
+              >
+                <Trash2 size={20} />
+                删除
+              </button>
               <button onClick={handleExport} className="p-2 text-orange-600 hover:bg-orange-50 rounded-full flex items-center gap-1 text-sm font-medium">
                 <Download size={20} />
                 导出

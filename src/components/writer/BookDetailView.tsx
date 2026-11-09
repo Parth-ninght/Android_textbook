@@ -4,15 +4,18 @@ import {
   BookOpen,
   Camera,
   ChevronLeft,
+  Crop,
   Download,
   Plus,
   Search,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { exportToZip, exportBookToTxt } from '../../lib/export';
 import { DebouncedInput, DebouncedTextarea } from '../DebouncedInputs';
 import { DocItemList } from './DocItemList';
 import { BookDetailChaptersTab } from './BookDetailChaptersTab';
+import { CoverCropModal } from './CoverCropModal';
 import { BookTabType, DocItemType } from './types';
 
 interface BookDetailViewProps {
@@ -98,6 +101,24 @@ export function BookDetailView({
   const [bookToDelete, setBookToDelete] = useState<string | null>(null);
   const [draftToDelete, setDraftToDelete] = useState<{ id: string; title: string } | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [pendingCropImage, setPendingCropImage] = useState<string | null>(null);
+  const [showRemoveCoverModal, setShowRemoveCoverModal] = useState(false);
+  const [showCoverActionMenu, setShowCoverActionMenu] = useState(false);
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const result = ev.target?.result as string;
+      if (result) {
+        setPendingCropImage(result);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const totalWords = activeBook.chapters.reduce(
     (acc, curr) => acc + (curr.isVolume ? 0 : curr.wordCount),
@@ -176,32 +197,67 @@ export function BookDetailView({
       <div className="flex-1 flex flex-col min-h-0 max-w-3xl mx-auto w-full px-4 pt-4 pb-2 overflow-hidden">
         {/* Book Info Card (Fixed top) */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 flex gap-4 sm:gap-5 mb-3 shrink-0">
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="w-16 h-24 sm:w-20 sm:h-28 bg-indigo-900 rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 group cursor-pointer"
-          >
-            {activeBook.coverImage ? (
-              <img
-                src={activeBook.coverImage}
-                alt="Cover"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <h3 className="font-bold text-white text-xs text-center z-10 line-clamp-4 p-1">
-                {activeBook.title}
-              </h3>
-            )}
-            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Camera size={18} className="text-white mb-1" />
-              <span className="text-[10px] text-white">更换封面</span>
-            </div>
+          {/* Book Cover */}
+          <div className="relative group shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (activeBook.coverImage) {
+                  setShowCoverActionMenu(true);
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className="w-16 h-24 sm:w-20 sm:h-28 bg-gradient-to-br from-indigo-900 to-indigo-950 rounded-lg flex flex-col items-center justify-center relative overflow-hidden shadow-sm cursor-pointer border border-indigo-800/40 select-none text-left focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              title={activeBook.coverImage ? '点击管理封面' : '点击添加封面'}
+            >
+              {activeBook.coverImage ? (
+                <>
+                  <img
+                    src={activeBook.coverImage}
+                    alt="Cover"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={18} className="text-white mb-0.5" />
+                    <span className="text-[10px] text-white font-medium">管理封面</span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-between p-1.5 text-center">
+                  <h3 className="font-bold text-white text-[11px] leading-tight line-clamp-3 mt-1">
+                    {activeBook.title}
+                  </h3>
+                  <div className="flex flex-col items-center justify-center mb-1">
+                    <div className="p-1 rounded-full bg-white/15 text-indigo-200 group-hover:bg-white/25 transition-colors">
+                      <Camera size={14} />
+                    </div>
+                    <span className="text-[9px] text-indigo-200 mt-0.5">添加封面</span>
+                  </div>
+                </div>
+              )}
+            </button>
             <input
               type="file"
               ref={fileInputRef}
-              onChange={handleImageUpload}
+              onChange={handleCoverFileChange}
               accept="image/*"
-              className="hidden"
+              className="sr-only"
             />
+            {activeBook.coverImage && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setShowRemoveCoverModal(true);
+                }}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow text-xs transition-transform active:scale-95 z-20"
+                title="移除封面"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <div className="flex-1 flex flex-col justify-between py-0.5">
             <div>
@@ -222,10 +278,33 @@ export function BookDetailView({
                 rows={2}
               />
             </div>
-            <div className="flex items-center gap-3 sm:gap-4 text-xs text-gray-400">
-              <span>总字数: {totalWords}</span>
-              <span>•</span>
-              <span>{activeBook.chapters.filter(c => !c.isVolume).length} 章节</span>
+            <div className="flex items-center justify-between text-xs text-gray-400 gap-2 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span>总字数: {totalWords}</span>
+                <span>•</span>
+                <span>{activeBook.chapters.filter(c => !c.isVolume).length} 章节</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-indigo-600 hover:text-indigo-700 hover:underline"
+                >
+                  {activeBook.coverImage ? '更换' : '加封面'}
+                </button>
+                {activeBook.coverImage && (
+                  <>
+                    <span>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRemoveCoverModal(true)}
+                      className="text-red-500 hover:text-red-600 hover:underline"
+                    >
+                      移除
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -473,6 +552,106 @@ export function BookDetailView({
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
               >
                 强制删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover Crop Modal */}
+      {pendingCropImage && (
+        <CoverCropModal
+          imageSrc={pendingCropImage}
+          onConfirm={croppedBase64 => {
+            onUpdateBook({ coverImage: croppedBase64 });
+            setPendingCropImage(null);
+          }}
+          onCancel={() => setPendingCropImage(null)}
+        />
+      )}
+
+      {/* Cover Action Menu Modal */}
+      {showCoverActionMenu && (
+        <div className="fixed inset-0 bg-black/50 z-[105] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0"
+            onClick={() => setShowCoverActionMenu(false)}
+          />
+          <div className="bg-white rounded-2xl w-full max-w-xs overflow-hidden shadow-2xl p-5 relative z-10 animate-in fade-in zoom-in-95 flex flex-col gap-2">
+            <h3 className="text-base font-bold text-gray-800 mb-1 text-center">封面选项</h3>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCoverActionMenu(false);
+                fileInputRef.current?.click();
+              }}
+              className="w-full py-2.5 px-4 text-left text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2.5 transition-colors"
+            >
+              <Camera size={18} className="text-indigo-500" />
+              更换新图片并裁剪
+            </button>
+            {activeBook.coverImage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCoverActionMenu(false);
+                  setPendingCropImage(activeBook.coverImage || null);
+                }}
+                className="w-full py-2.5 px-4 text-left text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2.5 transition-colors"
+              >
+                <Crop size={18} className="text-indigo-500" />
+                重新调整当前裁剪
+              </button>
+            )}
+            {activeBook.coverImage && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCoverActionMenu(false);
+                  setShowRemoveCoverModal(true);
+                }}
+                className="w-full py-2.5 px-4 text-left text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2.5 transition-colors"
+              >
+                <Trash2 size={18} className="text-red-500" />
+                移除当前封面
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowCoverActionMenu(false)}
+              className="w-full mt-2 py-2 text-center text-sm text-gray-400 hover:text-gray-600 rounded-lg"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Cover Confirmation Modal */}
+      {showRemoveCoverModal && (
+        <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 animate-in fade-in zoom-in-95">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">移除封面</h2>
+            <p className="text-gray-500 mb-6 text-sm leading-relaxed">
+              确定要移除《{activeBook.title}》的封面图片吗？移除后将恢复为默认文字封面。
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowRemoveCoverModal(false)}
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg text-sm"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateBook({ coverImage: '' });
+                  setShowRemoveCoverModal(false);
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium transition-colors"
+              >
+                确定移除
               </button>
             </div>
           </div>

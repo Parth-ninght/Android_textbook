@@ -20,6 +20,7 @@ import {
   importZipBackup,
   exportBooksToZip
 } from './writer/bookImportExport';
+import { compressImageFile } from '../lib/imageUtils';
 
 export default function WriterTab({
   setIsEditing,
@@ -153,16 +154,18 @@ export default function WriterTab({
     }
   }, [activeBookId, setIsEditing, isActiveTab]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeBook) return;
 
-    const reader = new FileReader();
-    reader.onload = event => {
-      const base64 = event.target?.result as string;
+    try {
+      const base64 = await compressImageFile(file);
       updateBook(activeBook.id, { coverImage: base64 });
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to compress and upload cover image:', err);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleExport = () => {

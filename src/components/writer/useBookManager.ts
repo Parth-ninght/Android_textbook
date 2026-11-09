@@ -185,12 +185,16 @@ export function useBookManager(settings: AppSettings) {
     setBooks(prev =>
       prev.map(b => {
         if (b.id !== id) return b;
-        return {
+        const updated = {
           ...b,
           ...updates,
           ...(isReadAction ? { lastOpenedAt: now } : { updatedAt: now }),
           order: getNextOrder(b.order, isReadAction)
         };
+        if ('coverImage' in updates && (!updates.coverImage || updates.coverImage === '')) {
+          delete updated.coverImage;
+        }
+        return updated;
       })
     );
   };

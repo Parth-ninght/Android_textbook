@@ -250,6 +250,28 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
     setSelectedFolderIds([]);
   };
 
+  const handleBatchDelete = () => {
+    const totalSelected = selectedNoteIds.length + selectedFolderIds.length;
+    if (totalSelected === 0) return;
+    if (window.confirm(`确定要删除选中的 ${totalSelected} 个项目吗？此操作无法撤销。`)) {
+      if (selectedNoteIds.length > 0) {
+        setNotes(prev => prev.filter(n => !selectedNoteIds.includes(n.id)));
+      }
+      if (selectedFolderIds.length > 0) {
+        setFolders(prev => prev.filter(f => !selectedFolderIds.includes(f.id)));
+        setNotes(prev =>
+          prev.map(n => (selectedFolderIds.includes(n.folderId || '') ? { ...n, folderId: undefined } : n))
+        );
+        if (selectedFolderIds.includes(activeFolderId || '')) {
+          setActiveFolderId(null);
+        }
+      }
+      setSelectedNoteIds([]);
+      setSelectedFolderIds([]);
+      setIsSelectMode(false);
+    }
+  };
+
   const toggleNoteSelection = (id: string) => {
     setSelectedNoteIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
@@ -380,6 +402,15 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
         <div className="flex gap-2">
           {isSelectMode ? (
             <>
+              <button
+                onClick={handleBatchDelete}
+                disabled={selectedNoteIds.length + selectedFolderIds.length === 0}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-full flex items-center gap-1 text-sm font-medium disabled:opacity-40"
+                title="批量删除"
+              >
+                <Trash2 size={20} />
+                删除
+              </button>
               <button onClick={handleExport} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full flex items-center gap-1 text-sm font-medium">
                 <Download size={20} />
                 导出
