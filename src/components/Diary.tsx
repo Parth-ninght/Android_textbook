@@ -146,9 +146,6 @@ export default function DiaryTab({ setIsEditing, settings, onOpenSettings, isAct
   };
 
   const handleExitDiary = () => {
-    if (activeDiary && !activeDiary.content.trim()) {
-      setDiaries(prev => prev.filter(d => d.id !== activeDiaryId));
-    }
     setActiveDiaryId(null);
   };
 

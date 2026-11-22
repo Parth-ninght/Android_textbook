@@ -28,7 +28,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, onConte
             <img {...props} className="max-w-full h-auto rounded-lg shadow-sm my-4" />
           ),
           audio: ({node, ...props}) => (
-            <audio {...props} className="w-full my-4" />
+            <audio controls {...props} className="w-full my-4" />
           ),
           li: ({ node, children, ...props }: any) => {
             const checked = props.checked;

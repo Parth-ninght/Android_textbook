@@ -6,3 +6,21 @@
     @apply transition-all duration-150 active:scale-95 active:opacity-80;
   }
 }
+
+.prose audio {
+  width: 100%;
+  margin: 0.75rem 0;
+  display: block;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #d1d5db;
+  pointer-events: none;
+}

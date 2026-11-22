@@ -1,7 +1,6 @@
 /**
  * Compresses an image file to a small base64 data URL with max dimensions and JPEG compression.
- * This keeps the image size under 50-80KB (instead of 5-15MB from phone cameras),
- * preventing browser localStorage QuotaExceededError while maintaining crisp cover display.
+ * Preserves GIF/SVG animations when reasonably sized, and never returns a larger payload than the original.
  */
 export function compressImageFile(
   file: File,
@@ -21,6 +20,12 @@ export function compressImageFile(
       const result = e.target?.result as string;
       if (!result) {
         reject(new Error('图片读取为空'));
+        return;
+      }
+
+      // Preserve animated GIFs and vector SVGs when under 2MB
+      if ((file.type === 'image/gif' || file.type === 'image/svg+xml') && file.size <= 2 * 1024 * 1024) {
+        resolve(result);
         return;
       }
 
@@ -51,7 +56,12 @@ export function compressImageFile(
 
         try {
           const compressed = canvas.toDataURL('image/jpeg', quality);
-          resolve(compressed);
+          // If original is smaller (e.g. tiny PNG/WebP), keep original unless dimensions exceeded max
+          if (compressed.length > result.length && img.width <= maxWidth && img.height <= maxHeight) {
+            resolve(result);
+          } else {
+            resolve(compressed);
+          }
         } catch {
           resolve(result);
         }

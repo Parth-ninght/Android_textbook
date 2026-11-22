@@ -115,9 +115,6 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
   };
 
   const handleExitNote = () => {
-    if (activeNote && !activeNote.title.trim() && !activeNote.content.trim()) {
-      setNotes(prev => prev.filter(n => n.id !== activeNoteId));
-    }
     setActiveNoteId(null);
   };
 
@@ -208,19 +205,21 @@ export default function Notes({ setIsEditing, settings, onOpenSettings, isActive
   const updateNote = (id: string, updates: Partial<Note>) => {
     const shouldBringToFront = settings.bringToFrontOnEdit !== false;
     const now = Date.now();
-    const maxOrder = notes.reduce((max, n) => Math.max(max, n.order ?? 0, n.updatedAt ?? 0), 0);
-    const nextOrder = shouldBringToFront ? Math.max(now, maxOrder + 1) : undefined;
-    setNotes(prev => prev.map(n => {
-      if (n.id === id) {
-        return {
-          ...n,
-          ...updates,
-          updatedAt: now,
-          order: nextOrder ?? (n.order ?? n.updatedAt ?? now)
-        };
-      }
-      return n;
-    }));
+    setNotes(prev => {
+      const maxOrder = prev.reduce((max, n) => Math.max(max, n.order ?? 0, n.updatedAt ?? 0), 0);
+      const nextOrder = shouldBringToFront ? Math.max(now, maxOrder + 1) : undefined;
+      return prev.map(n => {
+        if (n.id === id) {
+          return {
+            ...n,
+            ...updates,
+            updatedAt: now,
+            order: nextOrder ?? (n.order ?? n.updatedAt ?? now)
+          };
+        }
+        return n;
+      });
+    });
   };
 
   const deleteNote = (id: string) => {

@@ -12,7 +12,16 @@ export function stripMarkdown(md: string): string {
     const html = marked.parse(md, { async: false }) as string;
     const div = document.createElement('div');
     div.innerHTML = html;
-    return div.textContent || div.innerText || '';
+    const text = (div.textContent || div.innerText || '').trim();
+    const hasImg = div.querySelector('img') !== null;
+    const hasAudio = div.querySelector('audio') !== null;
+
+    if (text) return text;
+
+    const mediaLabels: string[] = [];
+    if (hasImg) mediaLabels.push('[图片]');
+    if (hasAudio) mediaLabels.push('[语音/音频]');
+    return mediaLabels.join(' ');
   } catch (e) {
     return md;
   }
